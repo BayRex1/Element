@@ -159,6 +159,32 @@ class PostsRemoteDataSource(
         )
     }
 
+    suspend fun setReaction(postId: Int, reaction: String): Map<String, Any?> {
+        return socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "post/set_reaction",
+                "payload" to mapOf(
+                    "post_id" to postId,
+                    "reaction" to reaction
+                )
+            )
+        )
+    }
+
+    suspend fun unsetReaction(postId: Int, reaction: String): Map<String, Any?> {
+        return socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "post/unset_reaction",
+                "payload" to mapOf(
+                    "post_id" to postId,
+                    "reaction" to reaction
+                )
+            )
+        )
+    }
+
     suspend fun votePostPoll(postId: Int, optionIds: List<Int>): Map<String, Any?> {
         return socketClient.sendRequest(
             mapOf(
