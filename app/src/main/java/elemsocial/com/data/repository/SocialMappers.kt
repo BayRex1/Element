@@ -6,10 +6,12 @@ import elemsocial.com.domain.model.PostComment
 import elemsocial.com.domain.model.PostCommentContent
 import elemsocial.com.domain.model.PostCommentReply
 import elemsocial.com.domain.model.PostContent
+import elemsocial.com.domain.model.PostFile
 import elemsocial.com.domain.model.PostImage
 import elemsocial.com.domain.model.PostImageAsset
 import elemsocial.com.domain.model.PostPoll
 import elemsocial.com.domain.model.PostPollOption
+import elemsocial.com.domain.model.PostReactions
 import elemsocial.com.domain.model.PostSong
 import elemsocial.com.domain.model.PostVideo
 import elemsocial.com.domain.model.PostVideoInfo
@@ -33,6 +35,7 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
         content = PostContent(
             images = parseImages(contentMap),
             videos = parseVideos(contentMap),
+            files = parseFiles(contentMap),
             filesCount = (contentMap["files"] as? List<*>)?.size ?: 0,
             videosCount = (contentMap["videos"] as? List<*>)?.size ?: 0,
             songs = parseSongs(contentMap)
@@ -46,7 +49,33 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
         disliked = map["disliked"].asBoolean(),
         myPost = map["my_post"].asBoolean(),
         deleted = map["deleted"].asBoolean(),
-        archived = map["archived"].asBoolean()
+        archived = map["archived"].asBoolean(),
+        reactions = parseReactions(map["reactions"])
+    )
+}
+
+internal fun parseReactions(raw: Any?): PostReactions? {
+    val map = raw.asRichMap() ?: return null
+    val resultsMap = map["results"].asRichMap() ?: map.asRichMap() ?: return null
+
+    val results = resultsMap.mapNotNull { (key, value) ->
+        val count = value.asInt() ?: return@mapNotNull null
+        if (count <= 0) return@mapNotNull null
+        key to count
+    }.toMap()
+
+    val userReactions = (map["user_reactions"] as? List<*>)
+        .orEmpty()
+        .mapNotNull { item ->
+            when (item) {
+                is String -> item.takeIf { it.isNotBlank() }
+                else -> item.asRichMap()?.get("reaction")?.toString()?.takeIf { it.isNotBlank() }
+            }
+        }
+
+    return PostReactions(
+        results = results,
+        userReactions = userReactions
     )
 }
 
@@ -200,6 +229,44 @@ private fun parseVideos(contentMap: Map<String, Any?>): List<PostVideo> {
     return (contentMap["videos"] as? List<*>)
         .orEmpty()
         .mapNotNull { parseVideo(it) }
+}
+
+private fun parseFiles(contentMap: Map<String, Any?>): List<PostFile> {
+    return (contentMap["files"] as? List<*>)
+        .orEmpty()
+        .mapNotNull { parseFile(it) }
+}
+
+private fun parseFile(raw: Any?): PostFile? {
+    val map = raw.asRichMap() ?: return null
+
+    val id = map["id"].asInt() ?: 0
+    val fileId = map["file_id"]?.toString()?.takeIf { it.isNotBlank() }
+        ?: map["fileId"]?.toString()?.takeIf { it.isNotBlank() }
+    val file = map["file"]?.toString()?.takeIf { it.isNotBlank() }
+        ?: map["name"]?.toString()?.takeIf { it.isNotBlank() }
+        ?: return null
+    val name = map["name"]?.toString()
+        ?: map["file_name"]?.toString()
+        ?: map["orig_name"]?.toString()
+        ?: file
+    val size = map["size"].asLong()
+        ?: map["file_size"].asLong()
+        ?: 0L
+    val mimeType = map["type"]?.toString()
+        ?: map["mime_type"]?.toString()
+    val path = map["path"]?.toString()?.takeIf { it.isNotBlank() }
+        ?: "posts/files"
+
+    return PostFile(
+        id = id,
+        fileId = fileId,
+        name = name,
+        size = size,
+        mimeType = mimeType,
+        path = path,
+        file = file
+    )
 }
 
 private fun parseSongs(contentMap: Map<String, Any?>): List<PostSong> {
