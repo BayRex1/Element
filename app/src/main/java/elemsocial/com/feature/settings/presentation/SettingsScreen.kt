@@ -314,7 +314,7 @@ private val ConfidentialityButtons = listOf(
     )
   )
   
-  private val OthersButtons = listOf(
+private val OtherButtons = listOf(
     SettingsMenuEntry(
         type = "elementum",
         label = "Настройки Elementum",
@@ -1375,7 +1375,7 @@ fun SettingsScreen(
     }
 
     Spacer(modifier = Modifier.height(74.dp))
-}
+
     linkEditorRequest?.takeIf { !isChannelMode }?.let { request ->
         SettingsLinkEditorModal(
             initialLink = request.link,
