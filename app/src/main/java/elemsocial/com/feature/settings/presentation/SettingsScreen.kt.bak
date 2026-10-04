@@ -1804,44 +1804,6 @@ private fun SettingsModalHeroIcon(
 }
 
 @Composable
-private fun SettingsElementumModal(
-    onClose: () -> Unit
-) {
-    UIKit.RoutedModal(
-        title = "Настройки Elementum",
-        onClose = onClose
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 4.dp, bottom = 10.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SettingsPartitionTitle("Основное")
-                UIKit.Block(
-                    modifier = Modifier.fillMaxWidth(),
-                    showShadow = false,
-                    contentPadding = 12.dp
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Здесь будут настройки Elementum",
-                            color = ElementUiPalette.TextSecondary,
-                            fontSize = SettingsModalSecondaryTextSize
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun SettingsAdvancedModal(
     notificationsToastEnabled: Boolean,
     autoVideoDownloadEnabled: Boolean,
