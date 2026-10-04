@@ -1337,7 +1337,6 @@ fun SettingsScreen(
             }
         )
     }
-}
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 SettingsPartitionTitle("Тип ленты")
                 SettingsPostsType(
