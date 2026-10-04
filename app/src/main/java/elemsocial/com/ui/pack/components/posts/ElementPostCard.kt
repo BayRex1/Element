@@ -185,31 +185,20 @@ fun ElementPostCard(
                 }
 
                 InteractionContainer(
-                    likes = likes,
-                    dislikes = dislikes,
+                    reactions = reactions,
                     comments = comments,
-                    liked = liked,
-                    disliked = disliked,
                     edited = edited,
                     interactionsEnabled = interactionsEnabled,
                     showCommentButton = showCommentButton,
                     shareOpen = shareOpen,
                     shareLink = shareLink,
-                    onLike = onLike,
-                    onDislike = onDislike,
+                    onReactionToggle = onReactionToggle,
                     onComment = onComment,
                     onCopyLink = onCopyLink,
                     onOpenShare = { shareOpen = true },
                     onCloseShare = { shareOpen = false },
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                if (reactions != null && onReactionToggle != null && !reactions.isEmpty) {
-                    ElementReactionBar(
-                        reactions = reactions,
-                        onToggle = onReactionToggle
-                    )
-                }
             }
 
             UIKit.ContextMenu(
@@ -493,18 +482,14 @@ private fun TopBar(
 
 @Composable
 private fun InteractionContainer(
-    likes: Int,
-    dislikes: Int,
+    reactions: PostReactions?,
     comments: Int,
-    liked: Boolean,
-    disliked: Boolean,
     edited: Boolean,
     interactionsEnabled: Boolean,
     showCommentButton: Boolean,
     shareOpen: Boolean,
     shareLink: String,
-    onLike: () -> Unit,
-    onDislike: () -> Unit,
+    onReactionToggle: ((reaction: String, isCurrentlySet: Boolean) -> Unit)?,
     onComment: () -> Unit,
     onCopyLink: () -> Unit,
     onOpenShare: () -> Unit,
@@ -522,10 +507,8 @@ private fun InteractionContainer(
         label = "postShareAlpha"
     )
 
-    Box(
-        modifier = modifier
-    ) {
-        Row(
+    Box(modifier = modifier) {
+        Column(
             modifier = Modifier
                 .graphicsLayer {
                     scaleX = interactionsScale
@@ -533,61 +516,62 @@ private fun InteractionContainer(
                     alpha = interactionsAlpha
                     transformOrigin = TransformOrigin(0f, 0.5f)
                 }
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            PostInteractionButton(
-                icon = painterResource(id = R.drawable.ic_element_like),
-                active = liked,
-                enabled = interactionsEnabled,
-                count = likes,
-                shape = RoundedCornerShape(topStart = 100.dp, bottomStart = 100.dp),
-                modifier = Modifier.padding(end = 2.dp),
-                onClick = onLike
-            )
-            PostInteractionButton(
-                icon = painterResource(id = R.drawable.ic_element_dislike),
-                active = disliked,
-                enabled = interactionsEnabled,
-                count = dislikes,
-                shape = RoundedCornerShape(topEnd = 100.dp, bottomEnd = 100.dp),
-                onClick = onDislike
-            )
-            if (showCommentButton) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (reactions != null && onReactionToggle != null) {
+                    ElementReactionBar(
+                        reactions = reactions,
+                        onToggle = onReactionToggle
+                    )
+                }
+
+                if (showCommentButton) {
+                    PostInteractionButton(
+                        icon = painterResource(id = R.drawable.ic_element_comment),
+                        active = false,
+                        enabled = true,
+                        count = comments,
+                        shape = RoundedCornerShape(30.dp),
+                        modifier = Modifier.padding(
+                            start = if (reactions != null && !reactions.isEmpty) 7.dp else 0.dp
+                        ),
+                        onClick = {
+                            onCloseShare()
+                            onComment()
+                        }
+                    )
+                }
+
                 PostInteractionButton(
-                    icon = painterResource(id = R.drawable.ic_element_comment),
+                    icon = painterResource(id = R.drawable.ic_element_share),
                     active = false,
                     enabled = true,
-                    count = comments,
+                    text = "Поделиться",
                     shape = RoundedCornerShape(30.dp),
-                    modifier = Modifier.padding(start = 7.dp),
-                    onClick = {
-                        onCloseShare()
-                        onComment()
-                    }
+                    modifier = Modifier.padding(
+                        start = if (showCommentButton || (reactions != null && !reactions.isEmpty)) 7.dp else 0.dp
+                    ),
+                    onClick = onOpenShare
                 )
-            }
-            PostInteractionButton(
-                icon = painterResource(id = R.drawable.ic_element_share),
-                active = false,
-                enabled = true,
-                text = "Поделиться",
-                shape = RoundedCornerShape(30.dp),
-                modifier = Modifier.padding(start = if (showCommentButton) 7.dp else 9.dp),
-                onClick = onOpenShare
-            )
 
-            if (edited) {
-                Spacer(modifier = Modifier.width(0.dp).weight(1f))
-                Text(
-                    text = "изменено",
-                    color = ElementUiPalette.TextLite,
-                    fontSize = 12.sp,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                    modifier = Modifier.padding(start = 8.dp, end = 2.dp)
-                )
+                if (edited) {
+                    Spacer(modifier = Modifier.width(0.dp).weight(1f))
+                    Text(
+                        text = "изменено",
+                        color = ElementUiPalette.TextLite,
+                        fontSize = 12.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        modifier = Modifier.padding(start = 8.dp, end = 2.dp)
+                    )
+                }
             }
         }
 
