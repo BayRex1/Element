@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.sp
 import elemsocial.com.R
+import elemsocial.com.domain.model.PostReactions
 import elemsocial.com.ui.pack.UIKit
 import elemsocial.com.ui.pack.components.modals.ElementContextMenuItem
 import elemsocial.com.ui.pack.components.text.ElementLinkText
@@ -103,6 +104,8 @@ fun ElementPostCard(
     onComment: () -> Unit,
     onCopyLink: () -> Unit,
     onDoubleTapLike: (Offset) -> Unit,
+    reactions: PostReactions? = null,
+    onReactionToggle: ((reaction: String, isCurrentlySet: Boolean) -> Unit)? = null,
     showShadow: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
@@ -200,6 +203,13 @@ fun ElementPostCard(
                     onCloseShare = { shareOpen = false },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                if (reactions != null && onReactionToggle != null && !reactions.isEmpty) {
+                    ElementReactionBar(
+                        reactions = reactions,
+                        onToggle = onReactionToggle
+                    )
+                }
             }
 
             UIKit.ContextMenu(
