@@ -7,6 +7,7 @@ import elemsocial.com.domain.model.FeedResult
 import elemsocial.com.domain.model.OnlineUser
 import elemsocial.com.domain.model.PollVoteResult
 import elemsocial.com.domain.model.PostDetailsResult
+import elemsocial.com.domain.model.PostFile
 import elemsocial.com.domain.model.PostImageAsset
 import elemsocial.com.domain.model.PostVideo
 import elemsocial.com.domain.model.PostPoll
@@ -109,6 +110,14 @@ class HomeGateway(
 
     suspend fun dislikePost(postId: Int): Boolean {
         return postsRepository.dislikePost(postId)
+    }
+
+    suspend fun setReaction(postId: Int, reaction: String): Boolean {
+        return postsRepository.setReaction(postId, reaction)
+    }
+
+    suspend fun unsetReaction(postId: Int, reaction: String): Boolean {
+        return postsRepository.unsetReaction(postId, reaction)
     }
 
     suspend fun votePostPoll(postId: Int, optionIds: List<Int>): PollVoteResult {
@@ -303,6 +312,57 @@ class HomeGateway(
         }
 
         return resolveCachedFile(video.cacheKey)
+    }
+
+    suspend fun loadFile(
+        file: PostFile,
+        onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _ -> },
+        isCancelled: () -> Boolean = { false }
+    ): File? {
+        resolveCachedFile(file.cacheKey)?.let { cached ->
+            onProgress(cached.length(), cached.length())
+            return cached
+        }
+
+        if (file.file.isBlank()) return null
+
+        val out = ByteArrayOutputStream()
+        var downloadedBytes = 0L
+        var totalBytes = file.size
+        var offset = 0L
+        var isLastChunk = false
+
+        while (!isLastChunk) {
+            if (isCancelled()) return null
+
+            val chunk = postsRepository.downloadFileChunk(
+                path = file.path,
+                file = file.file,
+                offset = offset
+            )
+            if (chunk.statusCode != 200) return null
+            if (chunk.buffer.isEmpty() && !chunk.isLastChunk) return null
+
+            out.write(chunk.buffer)
+            downloadedBytes += chunk.buffer.size
+            offset += chunk.buffer.size
+            totalBytes = maxOf(totalBytes, chunk.totalSize)
+            onProgress(downloadedBytes, totalBytes)
+            isLastChunk = chunk.isLastChunk
+        }
+
+        if (isCancelled()) return null
+
+        val payload = out.toByteArray()
+        if (payload.isEmpty()) return null
+
+        imageDiskCache?.let { cache ->
+            withContext(Dispatchers.IO) {
+                cache.write(file.cacheKey, payload)
+            }
+        }
+
+        return resolveCachedFile(file.cacheKey)
     }
 
     suspend fun loadStorageStats(): ImageDiskCache.StorageStats? {
