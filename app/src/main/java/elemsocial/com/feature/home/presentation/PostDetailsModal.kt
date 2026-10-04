@@ -81,6 +81,7 @@ import elemsocial.com.domain.model.FeedPost
 import elemsocial.com.domain.model.PostComment
 import elemsocial.com.domain.model.PostImage
 import elemsocial.com.domain.model.PostImageAsset
+import elemsocial.com.domain.model.PostReactions
 import elemsocial.com.domain.model.UploadFilePayload
 import elemsocial.com.feature.music.presentation.PostMusicTracksBlock
 import elemsocial.com.ui.pack.UIKit
@@ -632,6 +633,39 @@ fun PostDetailsModal(
                             },
                             onDoubleTapLike = { origin ->
                                 if (!interactionState.liked) toggleLike(origin)
+                            },
+                            reactions = readyPost.reactions,
+                            onReactionToggle = { emoji, isSet ->
+                                val currentReactions = post?.reactions ?: PostReactions()
+                                val updated = if (isSet) {
+                                    currentReactions.copy(
+                                        results = currentReactions.results.mapValues { (k, v) ->
+                                            if (k == emoji) (v - 1).coerceAtLeast(0) else v
+                                        }.filterValues { it > 0 },
+                                        userReactions = currentReactions.userReactions - emoji
+                                    )
+                                } else {
+                                    currentReactions.copy(
+                                        results = currentReactions.results.toMutableMap().apply {
+                                            this[emoji] = (this[emoji] ?: 0) + 1
+                                        },
+                                        userReactions = currentReactions.userReactions + emoji
+                                    )
+                                }
+
+                                post = post?.copy(reactions = updated)
+
+                                scope.launch {
+                                    val ok = if (isSet) {
+                                        homeGateway.unsetReaction(readyPost.id, emoji)
+                                    } else {
+                                        homeGateway.setReaction(readyPost.id, emoji)
+                                    }
+                                    if (!ok) {
+                                        post = post?.copy(reactions = currentReactions)
+                                        errorText = "Не удалось обновить реакцию"
+                                    }
+                                }
                             }
                         ) {
                             readyPost.poll?.let { poll ->
