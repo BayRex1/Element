@@ -318,7 +318,7 @@ private val ConfidentialityButtons = listOf(
         iconRes = R.drawable.ic_settings_elementum,
         color = Color(0xFFFFD700)
     ),
-    SettingsMenuEntry
+    SettingsMenuEntry(
         type = "advanced",
         label = "Расширенные настройки",
         iconRes = R.drawable.ic_settings_advanced,
@@ -1309,6 +1309,8 @@ fun SettingsScreen(
                     }
                 )
             }
+        }
+    }
 
     if (OtherButtons.isNotEmpty()) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
