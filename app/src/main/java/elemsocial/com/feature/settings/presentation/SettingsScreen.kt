@@ -311,13 +311,10 @@ private val ConfidentialityButtons = listOf(
         label = "Хранилище",
         iconRes = R.drawable.ic_settings_storage,
         color = Color(0xFF59AFFF)
-    )
-)
-
-private val OtherButtons = listOf<SettingsMenuEntry>(
+    ),
     SettingsMenuEntry(
         type = "elementum",
-        label = "Настройки Elementum"
+        label = "Настройки Elementum",
         iconRes = R.drawable.ic_settings_elementum,
         color = Color(0xFFFFD700)
     ),
