@@ -1,0 +1,6 @@
+# view AndroidManifest.xml #generated:27
+-keep class elemsocial.com.MainActivity { <init>(...); }
+
+# view AndroidManifest.xml #generated:40
+-keep class elemsocial.com.feature.music.presentation.MusicPlaybackService { <init>(...); }
+

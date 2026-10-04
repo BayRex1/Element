@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="12.7"
+    android:viewportHeight="12.7">
+    <!-- Большой круг слева (частично) - черный для monochrome -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M5.592,4.210A2.763,2.763 0,0 0,3.187 6.948A2.763,2.763 0,0 0,5.950 9.710A2.763,2.763 0,0 0,8.713 6.948A2.763,2.763 0,0 0,8.704 6.728A2.126,2.126 0,0 1,7.595 7.042A2.126,2.126 0,0 1,5.470 4.916A2.126,2.126 0,0 1,5.592 4.210Z" />
+    <!-- Маленький круг справа сверху - черный для monochrome -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M9.532,4.916A1.937,1.937 0,1 1,5.659 4.916A1.937,1.937 0,1 1,9.532 4.916Z" />
+</vector>
