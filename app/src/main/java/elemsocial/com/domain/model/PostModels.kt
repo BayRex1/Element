@@ -42,6 +42,13 @@ data class CommentsResult(
     val isSuccess: Boolean get() = status == "success"
 }
 
+data class PostReactions(
+    val results: Map<String, Int> = emptyMap(),
+    val userReactions: List<String> = emptyList()
+) {
+    val isEmpty: Boolean get() = results.isEmpty() && userReactions.isEmpty()
+}
+
 data class FeedPost(
     val id: Int,
     val author: PostAuthor? = null,
@@ -57,7 +64,8 @@ data class FeedPost(
     val disliked: Boolean = false,
     val myPost: Boolean = false,
     val deleted: Boolean = false,
-    val archived: Boolean = false
+    val archived: Boolean = false,
+    val reactions: PostReactions? = null
 )
 
 data class PostPoll(
@@ -99,12 +107,26 @@ data class PostAuthor(
 data class PostContent(
     val images: List<PostImage> = emptyList(),
     val videos: List<PostVideo> = emptyList(),
+    val files: List<PostFile> = emptyList(),
     val filesCount: Int = 0,
     val videosCount: Int = 0,
     val songs: List<PostSong> = emptyList()
 ) {
     val songsCount: Int
         get() = songs.size
+}
+
+data class PostFile(
+    val id: Int = 0,
+    val fileId: String? = null,
+    val name: String = "",
+    val size: Long = 0L,
+    val mimeType: String? = null,
+    val path: String = "posts/files",
+    val file: String = ""
+) {
+    val cacheKey: String
+        get() = if (fileId != null) "file:$fileId" else "$path/$file"
 }
 
 data class PostSong(
