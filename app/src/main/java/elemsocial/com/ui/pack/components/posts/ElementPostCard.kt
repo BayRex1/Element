@@ -11,8 +11,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -522,13 +520,12 @@ private fun InteractionContainer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
                     .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (reactions != null && onReactionToggle != null) {
+                if (onReactionToggle != null) {
                     ElementReactionBar(
-                        reactions = reactions,
+                        reactions = reactions ?: PostReactions(),
                         onToggle = onReactionToggle
                     )
                 }
@@ -540,9 +537,7 @@ private fun InteractionContainer(
                         enabled = true,
                         count = comments,
                         shape = RoundedCornerShape(30.dp),
-                        modifier = Modifier.padding(
-                            start = if (reactions != null && !reactions.isEmpty) 7.dp else 0.dp
-                        ),
+                        modifier = Modifier.padding(start = 7.dp),
                         onClick = {
                             onCloseShare()
                             onComment()
@@ -556,9 +551,7 @@ private fun InteractionContainer(
                     enabled = true,
                     text = "Поделиться",
                     shape = RoundedCornerShape(30.dp),
-                    modifier = Modifier.padding(
-                        start = if (showCommentButton || (reactions != null && !reactions.isEmpty)) 7.dp else 0.dp
-                    ),
+                    modifier = Modifier.padding(start = 7.dp),
                     onClick = onOpenShare
                 )
 
