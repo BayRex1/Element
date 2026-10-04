@@ -34,6 +34,13 @@ android {
 
     kotlinOptions {
         jvmTarget = '17'
+        freeCompilerArgs += [
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
+            "-opt-in=androidx.compose.ui.ExperimentalComposeUiApi"
+        ]
     }
 }
 
@@ -56,7 +63,7 @@ dependencies {
     implementation 'androidx.core:core-splashscreen:1.0.1'
     implementation 'androidx.annotation:annotation:1.9.1'
 
-    // Lifecycle (collectAsState)
+    // Lifecycle
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.6'
 
     // Kotlin Coroutines
@@ -79,7 +86,7 @@ dependencies {
     // SVG rendering
     implementation 'com.caverock:androidsvg:1.4'
 
-    // Jetpack Graphics (libandroidx.graphics.path.so)
+    // Jetpack Graphics
     implementation 'androidx.graphics:graphics-path:1.1.0'
 
     // Local unit tests
