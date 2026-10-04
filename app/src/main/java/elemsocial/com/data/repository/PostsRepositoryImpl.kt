@@ -83,10 +83,7 @@ class PostsRepositoryImpl(
     }
 
     override suspend fun editPost(postId: Int, text: String): ActionResult {
-        val response = remote.editPost(
-            postId = postId,
-            text = text
-        )
+        val response = remote.editPost(postId = postId, text = text)
         return actionResult(response)
     }
 
@@ -164,6 +161,16 @@ class PostsRepositoryImpl(
 
     override suspend fun dislikePost(postId: Int): Boolean {
         val response = remote.dislikePost(postId)
+        return isActionSuccessful(response)
+    }
+
+    override suspend fun setReaction(postId: Int, reaction: String): Boolean {
+        val response = remote.setReaction(postId, reaction)
+        return isActionSuccessful(response)
+    }
+
+    override suspend fun unsetReaction(postId: Int, reaction: String): Boolean {
+        val response = remote.unsetReaction(postId, reaction)
         return isActionSuccessful(response)
     }
 
