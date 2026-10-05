@@ -1,5 +1,6 @@
 package elemsocial.com.data.repository
 
+import android.util.Log
 import elemsocial.com.domain.model.FeedPost
 import elemsocial.com.domain.model.PostAuthor
 import elemsocial.com.domain.model.PostComment
@@ -24,6 +25,20 @@ internal fun parseFeedPosts(raw: Any?): List<FeedPost> {
 
 internal fun parseFeedPost(raw: Any?): FeedPost? {
     val map = raw.asMap() ?: return null
+
+    // ⬇️ ВРЕМЕННЫЙ ЛОГ — удалить после отладки ⬇️
+    Log.d("POST_RAW", "=== RAW POST ===")
+    Log.d("POST_RAW", map.toString())
+    Log.d("POST_RAW", "--- author ---")
+    Log.d("POST_RAW", map["author"]?.toString() ?: "null")
+    Log.d("POST_RAW", "--- avatar inside author ---")
+    val authorMap = map["author"].asRichMap()
+    Log.d("POST_RAW", authorMap?.get("avatar")?.toString() ?: "null")
+    Log.d("POST_RAW", "--- content ---")
+    Log.d("POST_RAW", map["content"]?.toString() ?: "null")
+    Log.d("POST_RAW", "=== END RAW POST ===")
+    // ⬆️ ВРЕМЕННЫЙ ЛОГ ⬆️
+
     val id = map["id"].asInt() ?: return null
     val contentMap = map["content"].asRichMap() ?: emptyMap()
 
@@ -173,12 +188,13 @@ internal fun parseAuthor(raw: Any?): PostAuthor? {
 internal fun parseAsset(raw: Any?): PostImageAsset? {
     val baseMap = raw.asRichMap() ?: return null
 
-    // Ищем file_id во всех возможных местах (Neo)
+    // Логируем каждый ассет, чтобы видеть формат
+    Log.d("ASSET_RAW", "asset = $baseMap")
+
     val fileId = baseMap["file_id"].asInt()
         ?: baseMap["fileId"].asInt()
         ?: baseMap["id"].asInt()
 
-    // Fallback: path/file из img_data/image/asset
     val map = baseMap["img_data"].asRichMap()
         ?: baseMap["image"].asRichMap()
         ?: baseMap["asset"].asRichMap()
