@@ -302,7 +302,7 @@ class HomeGateway(
             return cached
         }
 
-        val payload: ByteArray? = run {
+        val payload = run {
             val id = file.fileId
             if (id != null && id > 0) {
                 downloadStorageFileBytes(id, file.size, onProgress, isCancelled)
@@ -382,10 +382,17 @@ class HomeGateway(
             out.write(chunk)
             downloaded += chunk.size
             offset += chunk.size
-            total = maxOf(total, response["total_size"].asLong(0L) ?: 0L)
+            val rawTotal = response["total_size"]
+            val responseTotal: Long = when (rawTotal) {
+                is Number -> rawTotal.toLong()
+                is String -> rawTotal.toLongOrNull() ?: 0L
+                else -> 0L
+            }
+            total = maxOf(total, responseTotal)
             onProgress(downloaded, total)
 
-            if (response["is_last_chunk"].asBoolean()) isLast = true
+            val rawLast = response["is_last_chunk"]
+            if (rawLast is Boolean && rawLast) isLast = true
             if (chunk.size < 1024 && total <= 0L) isLast = true
         }
 
@@ -395,28 +402,32 @@ class HomeGateway(
     private fun extractGatewayBuffer(response: Map<String, Any?>?): ByteArray? {
         if (response == null) return null
 
-        response["buffer"].toByteArrayOrNull()?.let { return it }
+        val direct = response["buffer"]
+        if (direct is ByteArray) return direct
+        if (direct is List<*>) {
+            val bytes = ByteArray(direct.size)
+            for (i in direct.indices) {
+                val v = direct[i]
+                if (v !is Number) return null
+                bytes[i] = v.toByte()
+            }
+            return bytes
+        }
 
         val nested = (response["file"] as? Map<*, *>)?.get("buffer")
             ?: (response["data"] as? Map<*, *>)?.get("buffer")
-
-        return nested.toByteArrayOrNull()
-    }
-
-    private fun Any?.toByteArrayOrNull(): ByteArray? {
-        return when (this) {
-            is ByteArray -> this
-            is List<*> -> {
-                val bytes = ByteArray(size)
-                for (i in indices) {
-                    val v = this[i]
-                    if (v !is Number) return null
-                    bytes[i] = v.toByte()
-                }
-                bytes
+        if (nested is ByteArray) return nested
+        if (nested is List<*>) {
+            val bytes = ByteArray(nested.size)
+            for (i in nested.indices) {
+                val v = nested[i]
+                if (v !is Number) return null
+                bytes[i] = v.toByte()
             }
-            else -> null
+            return bytes
         }
+
+        return null
     }
 
     // === Storage stats ===
@@ -448,22 +459,5 @@ class HomeGateway(
         return withContext(Dispatchers.IO) {
             cache.clearByCategories(categories)
         }
-    }
-}
-
-private fun Any?.asLong(default: Long = 0L): Long {
-    return when (this) {
-        is Number -> toLong()
-        is String -> toLongOrNull() ?: default
-        else -> default
-    }
-}
-
-private fun Any?.asBoolean(): Boolean {
-    return when (this) {
-        is Boolean -> this
-        is Number -> toInt() != 0
-        is String -> this.equals("true", ignoreCase = true) || this == "1"
-        else -> false
     }
 }
