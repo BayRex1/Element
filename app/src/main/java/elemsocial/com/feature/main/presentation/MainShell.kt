@@ -104,7 +104,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.so
+import androidx.compose.ui.unit.sp
 import elemsocial.com.feature.settings.presentation.ElementumSettingsScreen
 import elemsocial.com.R
 import elemsocial.com.core.model.LocalTransparencyMode
