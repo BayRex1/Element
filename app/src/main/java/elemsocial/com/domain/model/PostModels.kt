@@ -118,7 +118,7 @@ data class PostContent(
 
 data class PostFile(
     val id: Int = 0,
-    val fileId: String? = null,
+    val fileId: Int? = null,
     val name: String = "",
     val size: Long = 0L,
     val mimeType: String? = null,
@@ -126,7 +126,14 @@ data class PostFile(
     val file: String = ""
 ) {
     val cacheKey: String
-        get() = if (fileId != null) "file:$fileId" else "$path/$file"
+        get() = when {
+            fileId != null && fileId > 0 -> "file:$fileId"
+            path.isNotBlank() && file.isNotBlank() -> "$path/$file"
+            else -> ""
+        }
+
+    val isEmpty: Boolean
+        get() = (fileId == null || fileId <= 0) && (path.isBlank() || file.isBlank())
 }
 
 data class PostSong(
@@ -146,14 +153,22 @@ data class PostImage(
 
 data class PostVideo(
     val path: String = "posts/videos",
-    val file: String,
+    val file: String = "",
+    val fileId: Int? = null,
     val fileName: String? = null,
     val fileSize: Long? = null,
     val preview: PostImageAsset? = null,
     val info: PostVideoInfo? = null
 ) {
     val cacheKey: String
-        get() = "$path/$file"
+        get() = when {
+            fileId != null && fileId > 0 -> "video:$fileId"
+            path.isNotBlank() && file.isNotBlank() -> "$path/$file"
+            else -> ""
+        }
+
+    val isEmpty: Boolean
+        get() = (fileId == null || fileId <= 0) && (path.isBlank() || file.isBlank())
 }
 
 data class PostVideoInfo(
@@ -162,14 +177,22 @@ data class PostVideoInfo(
 )
 
 data class PostImageAsset(
-    val path: String,
-    val file: String,
+    val fileId: Int? = null,
+    val path: String = "",
+    val file: String = "",
     val simple: String? = null,
     val aura: String? = null,
     val preview: String? = null
 ) {
     val cacheKey: String
-        get() = "$path/$file/${simple.orEmpty()}"
+        get() = when {
+            fileId != null && fileId > 0 -> "image:$fileId"
+            path.isNotBlank() && file.isNotBlank() -> "$path/$file/${simple.orEmpty()}"
+            else -> ""
+        }
+
+    val isEmpty: Boolean
+        get() = (fileId == null || fileId <= 0) && (path.isBlank() || file.isBlank())
 }
 
 data class OnlineUser(
@@ -191,6 +214,7 @@ data class DownloadChunkResult(
     val statusCode: Int,
     val buffer: ByteArray = ByteArray(0),
     val totalSize: Long = 0L,
+    val offset: Long = 0L,
     val isLastChunk: Boolean = true
 )
 
