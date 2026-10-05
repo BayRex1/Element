@@ -38,6 +38,7 @@ interface PostsRepository {
     suspend fun downloadImage(asset: PostImageAsset, preferLossless: Boolean = false): ByteArray?
     suspend fun downloadFileChunk(path: String, file: String, offset: Long): DownloadChunkResult
     suspend fun downloadFileByIdChunk(fileId: String, offset: Long): DownloadChunkResult
+    suspend fun downloadStorageChunk(fileId: Int, offset: Long, variant: String = "webp"): Map<String, Any?>
     suspend fun getFileData(fileId: Int, variant: String = "original"): Map<String, Any?>?
     suspend fun likePost(postId: Int): Boolean
     suspend fun dislikePost(postId: Int): Boolean
