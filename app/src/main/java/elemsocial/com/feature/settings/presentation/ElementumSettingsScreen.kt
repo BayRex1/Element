@@ -1,5 +1,6 @@
 package elemsocial.com.feature.settings.presentation
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,11 +29,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import elemsocial.com.R
 import elemsocial.com.ui.pack.UIKit
 import elemsocial.com.ui.pack.theme.ElementUiPalette
 
@@ -109,6 +113,7 @@ fun ElementumSettingsScreen(
                     ElementumMenuRow(
                         title = "Плагины",
                         subtitle = null,
+                        iconRes = R.drawable.ic_settings_plugins,
                         onClick = { pluginsOpen = true }
                     )
                 }
@@ -127,6 +132,7 @@ fun ElementumSettingsScreen(
 private fun ElementumMenuRow(
     title: String,
     subtitle: String?,
+    @DrawableRes iconRes: Int,
     onClick: () -> Unit
 ) {
     Row(
@@ -137,7 +143,26 @@ private fun ElementumMenuRow(
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(ElementUiPalette.Accent),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp)
+        ) {
             Text(
                 text = title,
                 color = ElementUiPalette.TextPrimary,
@@ -152,6 +177,7 @@ private fun ElementumMenuRow(
                 )
             }
         }
+
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
