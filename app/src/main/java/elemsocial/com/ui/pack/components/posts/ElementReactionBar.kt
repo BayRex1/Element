@@ -18,12 +18,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import elemsocial.com.R
 import elemsocial.com.domain.model.PostReactions
+import elemsocial.com.ui.pack.components.reactions.EmojiCatalog
 import elemsocial.com.ui.pack.theme.ElementUiPalette
 
 @Composable
@@ -32,6 +34,7 @@ fun ElementReactionBar(
     onToggle: (reaction: String, isCurrentlySet: Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var pickerOpen by remember { mutableStateOf(false) }
 
     Row(
@@ -55,8 +58,8 @@ fun ElementReactionBar(
             )
         }
 
-        reactions.results.forEach { (emoji, count) ->
-            val isSet = reactions.userReactions.contains(emoji)
+        reactions.results.forEach { (unified, count) ->
+            val isSet = reactions.userReactions.any { it.equals(unified, ignoreCase = true) }
             val background = if (isSet) {
                 ElementUiPalette.Accent.copy(alpha = 0.20f)
             } else {
@@ -64,11 +67,19 @@ fun ElementReactionBar(
             }
             val textColor = if (isSet) ElementUiPalette.Accent else ElementUiPalette.InteractionText
 
+            val emoji = remember(unified) {
+                EmojiCatalog.emojiFor(context, unified)
+                    ?: EmojiCatalog.load(context)
+                        .firstOrNull { it.unified.equals(unified, ignoreCase = true) }
+                        ?.emoji
+                    ?: unified
+            }
+
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(30.dp))
                     .background(background)
-                    .clickable { onToggle(emoji, isSet) }
+                    .clickable { onToggle(unified, isSet) }
                     .padding(horizontal = 8.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -88,7 +99,7 @@ fun ElementReactionBar(
         ElementReactionPickerModal(
             currentReactions = reactions,
             onSelect = { unified ->
-                val isSet = reactions.userReactions.contains(unified)
+                val isSet = reactions.userReactions.any { it.equals(unified, ignoreCase = true) }
                 onToggle(unified, isSet)
             },
             onDismiss = { pickerOpen = false }
