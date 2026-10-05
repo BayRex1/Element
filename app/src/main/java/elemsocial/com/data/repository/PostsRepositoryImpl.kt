@@ -276,6 +276,16 @@ class PostsRepositoryImpl(
         )
     }
 
+    // === Storage (Neo, file_id Int) ===
+
+    override suspend fun downloadStorageChunk(
+        fileId: Int,
+        offset: Long,
+        variant: String
+    ): Map<String, Any?> {
+        return remote.downloadStorageChunk(fileId, offset, variant)
+    }
+
     override suspend fun getFileData(fileId: Int, variant: String): Map<String, Any?>? {
         return runCatching { remote.getFileData(fileId, variant) }.getOrNull()
     }
