@@ -52,7 +52,6 @@ fun ElementumSettingsScreen(
             .fillMaxSize()
             .background(ElementUiPalette.Body)
     ) {
-        // Шапка
         Box(
             modifier = Modifier
                 .fillMaxWidth()
