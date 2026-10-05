@@ -11,8 +11,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.sp
 import elemsocial.com.R
+import elemsocial.com.domain.model.PostReactions
 import elemsocial.com.ui.pack.UIKit
 import elemsocial.com.ui.pack.components.modals.ElementContextMenuItem
 import elemsocial.com.ui.pack.components.text.ElementLinkText
@@ -103,6 +102,8 @@ fun ElementPostCard(
     onComment: () -> Unit,
     onCopyLink: () -> Unit,
     onDoubleTapLike: (Offset) -> Unit,
+    reactions: PostReactions? = null,
+    onReactionToggle: ((reaction: String, isCurrentlySet: Boolean) -> Unit)? = null,
     showShadow: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
@@ -182,18 +183,14 @@ fun ElementPostCard(
                 }
 
                 InteractionContainer(
-                    likes = likes,
-                    dislikes = dislikes,
+                    reactions = reactions,
                     comments = comments,
-                    liked = liked,
-                    disliked = disliked,
                     edited = edited,
                     interactionsEnabled = interactionsEnabled,
                     showCommentButton = showCommentButton,
                     shareOpen = shareOpen,
                     shareLink = shareLink,
-                    onLike = onLike,
-                    onDislike = onDislike,
+                    onReactionToggle = onReactionToggle,
                     onComment = onComment,
                     onCopyLink = onCopyLink,
                     onOpenShare = { shareOpen = true },
@@ -483,18 +480,14 @@ private fun TopBar(
 
 @Composable
 private fun InteractionContainer(
-    likes: Int,
-    dislikes: Int,
+    reactions: PostReactions?,
     comments: Int,
-    liked: Boolean,
-    disliked: Boolean,
     edited: Boolean,
     interactionsEnabled: Boolean,
     showCommentButton: Boolean,
     shareOpen: Boolean,
     shareLink: String,
-    onLike: () -> Unit,
-    onDislike: () -> Unit,
+    onReactionToggle: ((reaction: String, isCurrentlySet: Boolean) -> Unit)?,
     onComment: () -> Unit,
     onCopyLink: () -> Unit,
     onOpenShare: () -> Unit,
@@ -512,10 +505,8 @@ private fun InteractionContainer(
         label = "postShareAlpha"
     )
 
-    Box(
-        modifier = modifier
-    ) {
-        Row(
+    Box(modifier = modifier) {
+        Column(
             modifier = Modifier
                 .graphicsLayer {
                     scaleX = interactionsScale
@@ -523,61 +514,57 @@ private fun InteractionContainer(
                     alpha = interactionsAlpha
                     transformOrigin = TransformOrigin(0f, 0.5f)
                 }
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            PostInteractionButton(
-                icon = painterResource(id = R.drawable.ic_element_like),
-                active = liked,
-                enabled = interactionsEnabled,
-                count = likes,
-                shape = RoundedCornerShape(topStart = 100.dp, bottomStart = 100.dp),
-                modifier = Modifier.padding(end = 2.dp),
-                onClick = onLike
-            )
-            PostInteractionButton(
-                icon = painterResource(id = R.drawable.ic_element_dislike),
-                active = disliked,
-                enabled = interactionsEnabled,
-                count = dislikes,
-                shape = RoundedCornerShape(topEnd = 100.dp, bottomEnd = 100.dp),
-                onClick = onDislike
-            )
-            if (showCommentButton) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (onReactionToggle != null) {
+                    ElementReactionBar(
+                        reactions = reactions ?: PostReactions(),
+                        onToggle = onReactionToggle
+                    )
+                }
+
+                if (showCommentButton) {
+                    PostInteractionButton(
+                        icon = painterResource(id = R.drawable.ic_element_comment),
+                        active = false,
+                        enabled = true,
+                        count = comments,
+                        shape = RoundedCornerShape(30.dp),
+                        modifier = Modifier.padding(start = 7.dp),
+                        onClick = {
+                            onCloseShare()
+                            onComment()
+                        }
+                    )
+                }
+
                 PostInteractionButton(
-                    icon = painterResource(id = R.drawable.ic_element_comment),
+                    icon = painterResource(id = R.drawable.ic_element_share),
                     active = false,
                     enabled = true,
-                    count = comments,
+                    text = "Поделиться",
                     shape = RoundedCornerShape(30.dp),
                     modifier = Modifier.padding(start = 7.dp),
-                    onClick = {
-                        onCloseShare()
-                        onComment()
-                    }
+                    onClick = onOpenShare
                 )
-            }
-            PostInteractionButton(
-                icon = painterResource(id = R.drawable.ic_element_share),
-                active = false,
-                enabled = true,
-                text = "Поделиться",
-                shape = RoundedCornerShape(30.dp),
-                modifier = Modifier.padding(start = if (showCommentButton) 7.dp else 9.dp),
-                onClick = onOpenShare
-            )
 
-            if (edited) {
-                Spacer(modifier = Modifier.width(0.dp).weight(1f))
-                Text(
-                    text = "изменено",
-                    color = ElementUiPalette.TextLite,
-                    fontSize = 12.sp,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                    modifier = Modifier.padding(start = 8.dp, end = 2.dp)
-                )
+                if (edited) {
+                    Spacer(modifier = Modifier.width(0.dp).weight(1f))
+                    Text(
+                        text = "изменено",
+                        color = ElementUiPalette.TextLite,
+                        fontSize = 12.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        modifier = Modifier.padding(start = 8.dp, end = 2.dp)
+                    )
+                }
             }
         }
 

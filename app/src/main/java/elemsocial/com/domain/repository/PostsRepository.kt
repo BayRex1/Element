@@ -39,6 +39,8 @@ interface PostsRepository {
     suspend fun downloadFileChunk(path: String, file: String, offset: Long): DownloadChunkResult
     suspend fun likePost(postId: Int): Boolean
     suspend fun dislikePost(postId: Int): Boolean
+    suspend fun setReaction(postId: Int, reaction: String): Boolean
+    suspend fun unsetReaction(postId: Int, reaction: String): Boolean
     suspend fun votePostPoll(postId: Int, optionIds: List<Int>): PollVoteResult
     suspend fun deletePost(postId: Int): ActionResult
     suspend fun restorePost(postId: Int): ActionResult

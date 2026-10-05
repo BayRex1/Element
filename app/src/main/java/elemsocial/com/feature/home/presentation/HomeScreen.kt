@@ -84,6 +84,7 @@ import elemsocial.com.domain.model.OnlineUser
 import elemsocial.com.domain.model.PostImage
 import elemsocial.com.domain.model.PostImageAsset
 import elemsocial.com.domain.model.PostPoll
+import elemsocial.com.domain.model.PostReactions
 import elemsocial.com.domain.model.PostsCategory
 import elemsocial.com.domain.model.UploadFilePayload
 import elemsocial.com.ui.pack.UIKit
@@ -939,6 +940,36 @@ fun HomeScreen(
                                 onBlockToggle = { handleBlockToggle(post) },
                                 onOpenImageViewer = { imageIndex ->
                                     openImageViewer(post.content.images, imageIndex)
+                                },
+                                onReactionToggle = { emoji, isSet ->
+                                    val current = post.reactions ?: PostReactions()
+                                    val updated = if (isSet) {
+                                        current.copy(
+                                            results = current.results.mapValues { (k, v) ->
+                                                if (k == emoji) (v - 1).coerceAtLeast(0) else v
+                                            }.filterValues { it > 0 },
+                                            userReactions = current.userReactions - emoji
+                                        )
+                                    } else {
+                                        current.copy(
+                                            results = current.results.toMutableMap().apply {
+                                                this[emoji] = (this[emoji] ?: 0) + 1
+                                            },
+                                            userReactions = (current.userReactions + emoji).distinct()
+                                        )
+                                    }
+                                    mutatePostEverywhere(post.id) { it.copy(reactions = updated) }
+                                    scope.launch {
+                                        val ok = if (isSet) {
+                                            homeGateway.unsetReaction(post.id, emoji)
+                                        } else {
+                                            homeGateway.setReaction(post.id, emoji)
+                                        }
+                                        if (!ok) {
+                                            mutatePostEverywhere(post.id) { it.copy(reactions = current) }
+                                            transientError = "Не удалось обновить реакцию"
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -958,7 +989,6 @@ fun HomeScreen(
                             }
                         }
                     }
-
                 }
             }
 
@@ -1425,7 +1455,8 @@ private fun PostCard(
     onDeletePostForever: () -> Unit,
     onArchiveToggle: () -> Unit,
     onBlockToggle: () -> Unit,
-    onOpenImageViewer: (Int) -> Unit
+    onOpenImageViewer: (Int) -> Unit,
+    onReactionToggle: (String, Boolean) -> Unit
 ) {
     val authorName = post.author?.name ?: "Удаленный аккаунт"
     val authorUsername = post.author?.username ?: "unknown"
@@ -1491,6 +1522,8 @@ private fun PostCard(
         onComment = onOpenPost,
         onCopyLink = onCopyLink,
         onDoubleTapLike = onDoubleLike,
+        reactions = post.reactions,
+        onReactionToggle = onReactionToggle,
         showShadow = false,
     ) {
         post.poll?.let { poll ->

@@ -81,6 +81,7 @@ import elemsocial.com.domain.model.FeedPost
 import elemsocial.com.domain.model.PostComment
 import elemsocial.com.domain.model.PostImage
 import elemsocial.com.domain.model.PostImageAsset
+import elemsocial.com.domain.model.PostReactions
 import elemsocial.com.domain.model.UploadFilePayload
 import elemsocial.com.feature.music.presentation.PostMusicTracksBlock
 import elemsocial.com.ui.pack.UIKit
@@ -265,76 +266,6 @@ fun PostDetailsModal(
                 errorText = details?.message ?: "Не удалось загрузить пост"
             }
             loadingPost = false
-        }
-    }
-
-    fun toggleLike(burstOrigin: Offset? = null) {
-        val currentPost = post ?: return
-        val current = interaction ?: return
-        if (current.isSending) return
-
-        val next = if (current.liked) {
-            current.copy(
-                likes = max(0, current.likes - 1),
-                liked = false,
-                isSending = true
-            )
-        } else {
-            likeBurstToken += 1
-            likeBurstOrigin = burstOrigin
-            current.copy(
-                likes = current.likes + 1,
-                liked = true,
-                dislikes = if (current.disliked) max(0, current.dislikes - 1) else current.dislikes,
-                disliked = false,
-                isSending = true
-            )
-        }
-
-        interaction = next
-        scope.launch {
-            val ok = runCatching { homeGateway.likePost(currentPost.id) }.getOrDefault(false)
-            if (ok) {
-                interaction = next.copy(isSending = false)
-                errorText = null
-            } else {
-                interaction = current
-                errorText = "Не удалось обновить лайк"
-            }
-        }
-    }
-
-    fun toggleDislike() {
-        val currentPost = post ?: return
-        val current = interaction ?: return
-        if (current.isSending) return
-
-        val next = if (current.disliked) {
-            current.copy(
-                dislikes = max(0, current.dislikes - 1),
-                disliked = false,
-                isSending = true
-            )
-        } else {
-            current.copy(
-                dislikes = current.dislikes + 1,
-                disliked = true,
-                likes = if (current.liked) max(0, current.likes - 1) else current.likes,
-                liked = false,
-                isSending = true
-            )
-        }
-
-        interaction = next
-        scope.launch {
-            val ok = runCatching { homeGateway.dislikePost(currentPost.id) }.getOrDefault(false)
-            if (ok) {
-                interaction = next.copy(isSending = false)
-                errorText = null
-            } else {
-                interaction = current
-                errorText = "Не удалось обновить дизлайк"
-            }
         }
     }
 
@@ -623,15 +554,51 @@ fun PostDetailsModal(
                             governItems = governItems,
                             likeBurstTrigger = likeBurstToken,
                             likeBurstOrigin = likeBurstOrigin,
-                            onLike = { toggleLike() },
-                            onDislike = ::toggleDislike,
+                            onLike = {},
+                            onDislike = {},
                             onComment = {},
                             onCopyLink = {
                                 clipboard.setText(AnnotatedString(postLink(readyPost.id)))
                                 Toast.makeText(context, "Ссылка скопирована", Toast.LENGTH_SHORT).show()
                             },
                             onDoubleTapLike = { origin ->
-                                if (!interactionState.liked) toggleLike(origin)
+                                if (!interactionState.liked) {
+                                    likeBurstToken += 1
+                                    likeBurstOrigin = origin
+                                }
+                            },
+                            reactions = readyPost.reactions,
+                            onReactionToggle = { emoji, isSet ->
+                                val currentReactions = post?.reactions ?: PostReactions()
+                                val updated = if (isSet) {
+                                    currentReactions.copy(
+                                        results = currentReactions.results.mapValues { (k, v) ->
+                                            if (k == emoji) (v - 1).coerceAtLeast(0) else v
+                                        }.filterValues { it > 0 },
+                                        userReactions = currentReactions.userReactions - emoji
+                                    )
+                                } else {
+                                    currentReactions.copy(
+                                        results = currentReactions.results.toMutableMap().apply {
+                                            this[emoji] = (this[emoji] ?: 0) + 1
+                                        },
+                                        userReactions = currentReactions.userReactions + emoji
+                                    )
+                                }
+
+                                post = post?.copy(reactions = updated)
+
+                                scope.launch {
+                                    val ok = if (isSet) {
+                                        homeGateway.unsetReaction(readyPost.id, emoji)
+                                    } else {
+                                        homeGateway.setReaction(readyPost.id, emoji)
+                                    }
+                                    if (!ok) {
+                                        post = post?.copy(reactions = currentReactions)
+                                        errorText = "Не удалось обновить реакцию"
+                                    }
+                                }
                             }
                         ) {
                             readyPost.poll?.let { poll ->
@@ -656,7 +623,8 @@ fun PostDetailsModal(
                                     },
                                     onDoubleTap = { origin ->
                                         if (!interactionState.liked) {
-                                            toggleLike(origin)
+                                            likeBurstToken += 1
+                                            likeBurstOrigin = origin
                                         }
                                     }
                                 )
@@ -675,7 +643,8 @@ fun PostDetailsModal(
                                     },
                                     onDoubleTapLike = { origin ->
                                         if (!interactionState.liked) {
-                                            toggleLike(origin)
+                                            likeBurstToken += 1
+                                            likeBurstOrigin = origin
                                         }
                                     }
                                 )
