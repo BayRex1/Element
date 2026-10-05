@@ -375,7 +375,8 @@ class HomeGateway(
             if (isCancelled()) return null
 
             val response = postsRepository.downloadStorageChunk(fileId, offset, "original")
-            val chunk: ByteArray = extractGatewayBuffer(response) ?: return null
+            val chunk = extractGatewayBuffer(response)
+            if (chunk == null) return null
             if (chunk.isEmpty()) break
 
             out.write(chunk)
@@ -394,19 +395,21 @@ class HomeGateway(
     private fun extractGatewayBuffer(response: Map<String, Any?>?): ByteArray? {
         if (response == null) return null
 
-        convertToByteArray(response["buffer"])?.let { return it }
+        response["buffer"].toByteArrayOrNull()?.let { return it }
+
         val nested = (response["file"] as? Map<*, *>)?.get("buffer")
             ?: (response["data"] as? Map<*, *>)?.get("buffer")
-        return convertToByteArray(nested)
+
+        return nested.toByteArrayOrNull()
     }
 
-    private fun convertToByteArray(raw: Any?): ByteArray? {
-        return when (raw) {
-            is ByteArray -> raw
+    private fun Any?.toByteArrayOrNull(): ByteArray? {
+        return when (this) {
+            is ByteArray -> this
             is List<*> -> {
-                val bytes = ByteArray(raw.size)
-                for (i in raw.indices) {
-                    val v = raw[i]
+                val bytes = ByteArray(size)
+                for (i in indices) {
+                    val v = this[i]
                     if (v !is Number) return null
                     bytes[i] = v.toByte()
                 }
