@@ -104,7 +104,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.so
+import elemsocial.com.feature.settings.presentation.ElementumSettingsScreen
 import elemsocial.com.R
 import elemsocial.com.core.model.LocalTransparencyMode
 import elemsocial.com.core.model.glassAlphaFor
@@ -259,6 +260,7 @@ fun MainShell(
     var isDownloadsOpen by remember { mutableStateOf(false) }
     var selectedComposerChannelId by remember { mutableStateOf<Int?>(null) }
     var editingChannel by remember { mutableStateOf<AuthAccountChannel?>(null) }
+    var elementumSettingsOpen by remember { mutableStateOf(false) }
     var channelOverrides by remember { mutableStateOf<Map<Int, AuthAccountChannel>>(emptyMap()) }
     var refreshCounters by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var refreshingRouteId by remember { mutableStateOf<String?>(null) }
@@ -520,52 +522,56 @@ fun MainShell(
             onRefresh = { refreshCurrentPage() }
         ) {
             if (editingChannel != null) {
-                val channelSettingsRouteId = routeIdForChannelSettings(editingChannel!!)
-                key(channelSettingsRouteId, refreshKey(channelSettingsRouteId)) {
-                    SettingsScreen(
-                        accountName = accountName,
-                        accountEmail = accountEmail,
-                        accountUsername = accountUsername,
-                        accountAvatar = accountAvatar,
-                        homeGateway = homeGateway,
-                        authGateway = authGateway,
-                        profileGateway = profileGateway,
-                        themeMode = themeMode,
-                        defaultFeed = defaultFeed,
-                        notificationsToastEnabled = notificationsToastEnabled,
-                        autoVideoDownloadEnabled = autoVideoDownloadEnabled,
-                        videoAutoplayEnabled = videoAutoplayEnabled,
-                        transparencyMode = transparencyMode,
-                        onThemeChanged = onThemeChanged,
-                        onDefaultFeedChanged = onDefaultFeedChanged,
-                        onNotificationsToastChanged = onNotificationsToastChanged,
-                        onAutoVideoDownloadChanged = onAutoVideoDownloadChanged,
-                        onVideoAutoplayChanged = onVideoAutoplayChanged,
-                        onTransparencyModeChanged = onTransparencyModeChanged,
-                        onAccountEmailUpdated = onAccountEmailUpdated,
-                        onAccountUsernameUpdated = onAccountUsernameUpdated,
-                        onLogout = onLogout,
-                        channelToEdit = editingChannel,
-                        onChannelUpdated = { updated ->
-                            updated.id?.let { channelId ->
-                                channelOverrides = channelOverrides + (channelId to updated)
-                            }
-                            val previousUsername = normalizeProfileUsername(editingChannel?.username)
-                            val updatedUsername = normalizeProfileUsername(updated.username)
-                            if (
-                                !previousUsername.isNullOrBlank() &&
-                                activeProfileUsername.equals(previousUsername, ignoreCase = true) &&
-                                !updatedUsername.isNullOrBlank()
-                            ) {
-                                openedProfileUsername = updatedUsername
-                            }
-                            editingChannel = updated
-                        },
-                        onBack = { editingChannel = null },
-                        modifier = Modifier.fillMaxSize()
-                    )
+    val channelSettingsRouteId = routeIdForChannelSettings(editingChannel!!)
+    key(channelSettingsRouteId, refreshKey(channelSettingsRouteId)) {
+        SettingsScreen(
+            accountName = accountName,
+            accountEmail = accountEmail,
+            accountUsername = accountUsername,
+            accountAvatar = accountAvatar,
+            homeGateway = homeGateway,
+            authGateway = authGateway,
+            profileGateway = profileGateway,
+            themeMode = themeMode,
+            defaultFeed = defaultFeed,
+            notificationsToastEnabled = notificationsToastEnabled,
+            autoVideoDownloadEnabled = autoVideoDownloadEnabled,
+            videoAutoplayEnabled = videoAutoplayEnabled,
+            transparencyMode = transparencyMode,
+            onThemeChanged = onThemeChanged,
+            onDefaultFeedChanged = onDefaultFeedChanged,
+            onNotificationsToastChanged = onNotificationsToastChanged,
+            onAutoVideoDownloadChanged = onAutoVideoDownloadChanged,
+            onVideoAutoplayChanged = onVideoAutoplayChanged,
+            onTransparencyModeChanged = onTransparencyModeChanged,
+            onAccountEmailUpdated = onAccountEmailUpdated,
+            onAccountUsernameUpdated = onAccountUsernameUpdated,
+            onLogout = onLogout,
+            onOpenElementumSettings = {
+                elementumSettingsOpen = true
+            },
+            channelToEdit = editingChannel,
+            onChannelUpdated = { updated ->
+                updated.id?.let { channelId ->
+                    channelOverrides = channelOverrides + (channelId to updated)
                 }
-            } else if (activeProfileUsername != null) {
+                val previousUsername = normalizeProfileUsername(editingChannel?.username)
+                val updatedUsername = normalizeProfileUsername(updated.username)
+                if (
+                    !previousUsername.isNullOrBlank() &&
+                    activeProfileUsername.equals(previousUsername, ignoreCase = true) &&
+                    !updatedUsername.isNullOrBlank()
+                ) {
+                    openedProfileUsername = updatedUsername
+                }
+                editingChannel = updated
+            },
+            onBack = { editingChannel = null },
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+            else if (activeProfileUsername != null) {
                 key(activeProfileRouteId, activeProfileRouteId?.let(::refreshKey) ?: 0) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         ProfileScreen(
@@ -858,31 +864,34 @@ fun MainShell(
                             )
                         }
 
-                        MainTab.Settings -> key(settingsRouteId, refreshKey(settingsRouteId)) {
+                         MainTab.Settings -> key(settingsRouteId, refreshKey(settingsRouteId)) {
                             SettingsScreen(
-                                accountName = accountName,
-                                accountEmail = accountEmail,
-                                accountUsername = accountUsername,
-                                accountAvatar = accountAvatar,
-                                homeGateway = homeGateway,
-                                authGateway = authGateway,
-                                profileGateway = profileGateway,
-                                themeMode = themeMode,
-                                defaultFeed = defaultFeed,
-                                notificationsToastEnabled = notificationsToastEnabled,
-                                autoVideoDownloadEnabled = autoVideoDownloadEnabled,
-                                videoAutoplayEnabled = videoAutoplayEnabled,
-                                transparencyMode = transparencyMode,
-                                onThemeChanged = onThemeChanged,
-                                onDefaultFeedChanged = onDefaultFeedChanged,
-                                onNotificationsToastChanged = onNotificationsToastChanged,
-                                onAutoVideoDownloadChanged = onAutoVideoDownloadChanged,
-                                onVideoAutoplayChanged = onVideoAutoplayChanged,
-                                onTransparencyModeChanged = onTransparencyModeChanged,
-                                onAccountEmailUpdated = onAccountEmailUpdated,
-                                onAccountUsernameUpdated = onAccountUsernameUpdated,
-                                onLogout = onLogout,
-                                modifier = Modifier.fillMaxSize()
+                               accountName = accountName,
+                               accountEmail = accountEmail,
+                               accountUsername = accountUsername,
+                               accountAvatar = accountAvatar,
+                               homeGateway = homeGateway,
+                               authGateway = authGateway,
+                               profileGateway = profileGateway,
+                               themeMode = themeMode,
+                               defaultFeed = defaultFeed,
+                               notificationsToastEnabled = notificationsToastEnabled,
+                               autoVideoDownloadEnabled = autoVideoDownloadEnabled,
+                               videoAutoplayEnabled = videoAutoplayEnabled,
+                               transparencyMode = transparencyMode,
+                               onThemeChanged = onThemeChanged,
+                               onDefaultFeedChanged = onDefaultFeedChanged,
+                               onNotificationsToastChanged = onNotificationsToastChanged,
+                               onAutoVideoDownloadChanged = onAutoVideoDownloadChanged,
+                               onVideoAutoplayChanged = onVideoAutoplayChanged,
+                               onTransparencyModeChanged = onTransparencyModeChanged,
+                               onAccountEmailUpdated = onAccountEmailUpdated,
+                               onAccountUsernameUpdated = onAccountUsernameUpdated,
+                               onLogout = onLogout,
+                               onOpenElementumSettings = {
+                                 elementumSettingsOpen = true
+                               },
+                              modifier = Modifier.fillMaxSize()
                             )
                         }
 
@@ -1112,7 +1121,7 @@ fun MainShell(
             )
         }
 
-        AnimatedVisibility(
+                AnimatedVisibility(
             visible = isSidebarOpen,
             enter = slideInHorizontally(
                 animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
@@ -1217,10 +1226,27 @@ fun MainShell(
                 }
             )
         }
+
+        // ⬇️⬇️⬇️ ВСТАВЬ ЭТОТ БЛОК ЗДЕСЬ ⬇️⬇️⬇️
+        // (перед закрывающей скобкой Box, но после AnimatedVisibility)
+        if (elementumSettingsOpen) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { elementumSettingsOpen = false },
+                properties = androidx.compose.ui.window.DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
+            ) {
+                ElementumSettingsScreen(
+                    onBack = { elementumSettingsOpen = false },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        // ⬆️⬆️⬆️ КОНЕЦ ВСТАВКИ ⬆️⬆️⬆️
     }
 }
 }
-
 @Composable
 private fun ShellHeaderContainer(
     content: @Composable ColumnScope.() -> Unit

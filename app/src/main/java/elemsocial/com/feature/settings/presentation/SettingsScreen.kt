@@ -312,16 +312,16 @@ private val ConfidentialityButtons = listOf(
         iconRes = R.drawable.ic_settings_storage,
         color = Color(0xFF59AFFF)
     )
-)
-
-private val OtherButtons = listOf<SettingsMenuEntry>(
+  )
+  
+  private val OtherButtons = listOf(
     SettingsMenuEntry(
         type = "elementum",
-        label = "Настройки Elementum"
+        label = "Настройки Elementum",
         iconRes = R.drawable.ic_settings_elementum,
         color = Color(0xFFFFD700)
     ),
-    SettingsMenuEntry
+    SettingsMenuEntry(
         type = "advanced",
         label = "Расширенные настройки",
         iconRes = R.drawable.ic_settings_advanced,
@@ -365,6 +365,7 @@ fun SettingsScreen(
     onAccountEmailUpdated: (String) -> Unit = {},
     onAccountUsernameUpdated: (String) -> Unit = {},
     onLogout: () -> Unit,
+    onOpenElementumSettings: () -> Unit = {},
     channelToEdit: AuthAccountChannel? = null,
     onChannelUpdated: (AuthAccountChannel) -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -383,7 +384,6 @@ fun SettingsScreen(
     var changeUsernameModalOpen by remember { mutableStateOf(false) }
     var changeEmailModalOpen by remember { mutableStateOf(false) }
     var advancedSettingsModalOpen by remember { mutableStateOf(false) }
-    var elementumSettingsModalOpen by remember { mutableStateOf(false) }
     var deleteAccountModalOpen by remember { mutableStateOf(false) }
     var profile by remember(accountUsername, channelToEdit?.id, channelToEdit?.username) { mutableStateOf<Profile?>(null) }
     var targetUsername by remember(accountUsername, channelToEdit?.id, channelToEdit?.username) {
@@ -1227,7 +1227,7 @@ fun SettingsScreen(
             }
         }
 
-        SettingsEditProfile(
+                SettingsEditProfile(
             title = if (onBack != null) "" else if (isChannelMode) "Редактирование канала" else "Редактирование профиля",
             name = editedName,
             onNameChange = { editedName = it },
@@ -1313,68 +1313,69 @@ fun SettingsScreen(
                 )
             }
 
-    if (OtherButtons.isNotEmpty()) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        SettingsPartitionTitle("Прочее")
-        SettingsMenuGroup(
-            entries = OtherButtons,
-            onClick = { entry ->
-                when (entry.type) {
-                    "elementum" -> {
-                        elementumSettingsModalOpen = true
-                    }
+            if (OtherButtons.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    SettingsPartitionTitle("Прочее")
+                    SettingsMenuGroup(
+                        entries = OtherButtons,
+                        onClick = { entry ->
+                            when (entry.type) {
+                                "elementum" -> {
+                                    onOpenElementumSettings()
+                                }
 
-                    "advanced" -> {
-                        advancedSettingsModalOpen = true
-                    }
+                                "advanced" -> {
+                                    advancedSettingsModalOpen = true
+                                }
 
-                    "delete_account" -> {
-                        resetDeleteAccountFlow(resetPostsToggle = true)
-                        deleteAccountModalOpen = true
-                    }
+                                "delete_account" -> {
+                                    resetDeleteAccountFlow(resetPostsToggle = true)
+                                    deleteAccountModalOpen = true
+                                }
 
-                    else -> showSoon(entry.label)
+                                else -> showSoon(entry.label)
+                            }
+                        }
+                    )
                 }
             }
-        )
-    }
-}
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                SettingsPartitionTitle("Тип ленты")
-                SettingsPostsType(
-                    selected = defaultFeed,
-                    onSelect = onDefaultFeedChanged
-                )
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                SettingsPartitionTitle("Смена темы")
-                UIKit.SegmentTabs(
-                    tabs = listOf("Светлая", "Темная", "AMOLED"),
-                    selectedIndex = when (themeMode) {
-                        AppThemeMode.Dark -> 1
-                        AppThemeMode.Amoled -> 2
-                        AppThemeMode.System,
-                        AppThemeMode.Light -> 0
-                    },
-                    onSelect = { index ->
-                        onThemeChanged(
-                            when (index) {
-                                1 -> AppThemeMode.Dark
-                                2 -> AppThemeMode.Amoled
-                                else -> AppThemeMode.Light
-                            }
-                        )
-                    }
-                )
-            }
-
-            SettingsBuildFooter()
         }
 
-        Spacer(modifier = Modifier.height(74.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            SettingsPartitionTitle("Тип ленты")
+            SettingsPostsType(
+                selected = defaultFeed,
+                onSelect = onDefaultFeedChanged
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            SettingsPartitionTitle("Смена темы")
+            UIKit.SegmentTabs(
+                tabs = listOf("Светлая", "Темная", "AMOLED"),
+                selectedIndex = when (themeMode) {
+                    AppThemeMode.Dark -> 1
+                    AppThemeMode.Amoled -> 2
+                    AppThemeMode.System,
+                    AppThemeMode.Light -> 0
+                },
+                onSelect = { index ->
+                    onThemeChanged(
+                        when (index) {
+                            1 -> AppThemeMode.Dark
+                            2 -> AppThemeMode.Amoled
+                            else -> AppThemeMode.Light
+                        }
+                    )
+                }
+            )
+        }
+
+        SettingsBuildFooter()
     }
 
+    Spacer(modifier = Modifier.height(74.dp))
+    
     linkEditorRequest?.takeIf { !isChannelMode }?.let { request ->
         SettingsLinkEditorModal(
             initialLink = request.link,
@@ -1472,11 +1473,6 @@ fun SettingsScreen(
             onClose = ::closeChangePasswordModal,
             onAction = ::submitChangePassword
         )
-    }
-    if (elementumSettingsModalOpen) {
-        SettingsElementumModal(
-            onClose = { elementumSettingsModalOpen = false }
-         )
     }
     if (advancedSettingsModalOpen) {
         SettingsAdvancedModal(
@@ -1800,44 +1796,6 @@ private fun SettingsModalHeroIcon(
             tint = tint,
             modifier = Modifier.size(28.dp)
         )
-    }
-}
-
-@Composable
-private fun SettingsElementumModal(
-    onClose: () -> Unit
-) {
-    UIKit.RoutedModal(
-        title = "Настройки Elementum",
-        onClose = onClose
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 4.dp, bottom = 10.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                SettingsPartitionTitle("Основное")
-                UIKit.Block(
-                    modifier = Modifier.fillMaxWidth(),
-                    showShadow = false,
-                    contentPadding = 12.dp
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Здесь будут настройки Elementum",
-                            color = ElementUiPalette.TextSecondary,
-                            fontSize = SettingsModalSecondaryTextSize
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -3388,7 +3346,7 @@ private fun SettingsBuildFooter() {
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
-            text = "Element by moretti",
+            text = "Element by BayRex",
             color = signatureColor,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
