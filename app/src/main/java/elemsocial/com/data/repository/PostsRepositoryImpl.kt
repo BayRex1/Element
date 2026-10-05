@@ -5,17 +5,16 @@ import elemsocial.com.data.remote.PostsRemoteDataSource
 import elemsocial.com.domain.model.ActionResult
 import elemsocial.com.domain.model.CommentsResult
 import elemsocial.com.domain.model.DownloadChunkResult
-import elemsocial.com.domain.model.FeedPost
 import elemsocial.com.domain.model.FeedResult
 import elemsocial.com.domain.model.OnlineUser
 import elemsocial.com.domain.model.PollVoteResult
-import elemsocial.com.domain.model.PostComment
 import elemsocial.com.domain.model.PostDetailsResult
 import elemsocial.com.domain.model.PostImageAsset
 import elemsocial.com.domain.model.PostPoll
 import elemsocial.com.domain.model.PostsCategory
 import elemsocial.com.domain.model.UploadFilePayload
 import elemsocial.com.domain.repository.PostsRepository
+import java.io.ByteArrayOutputStream
 
 class PostsRepositoryImpl(
     socketClient: ElementSocketClient
@@ -61,12 +60,7 @@ class PostsRepositoryImpl(
             text = text,
             files = payloadFiles,
             songs = songs,
-            from = fromChannelId?.let { channelId ->
-                mapOf(
-                    "type" to 1,
-                    "id" to channelId
-                )
-            },
+            from = fromChannelId?.let { channelId -> mapOf("type" to 1, "id" to channelId) },
             wallUsername = wallUsername,
             poll = poll?.let { composerPoll ->
                 mapOf(
@@ -89,24 +83,22 @@ class PostsRepositoryImpl(
 
     override suspend fun loadPosts(category: PostsCategory, startIndex: Int): FeedResult {
         val response = remote.loadPosts(category, startIndex)
+        android.util.Log.d("SERVER_JSON", "loadPosts = $response")
         val status = response["status"]?.toString()
             ?: if (response.containsKey("posts")) "success" else "error"
-        val message = response["message"]?.toString()
-        val posts = parseFeedPosts(response["posts"])
-
         return FeedResult(
             status = status,
-            message = message,
-            posts = posts,
+            message = response["message"]?.toString(),
+            posts = parseFeedPosts(response["posts"]),
             raw = response
         )
     }
 
     override suspend fun loadPost(postId: Int): PostDetailsResult {
         val response = remote.loadPost(postId)
+        android.util.Log.d("SERVER_JSON", "loadPost = $response")
         val status = response["status"]?.toString()
             ?: if (response.containsKey("post")) "success" else "error"
-
         return PostDetailsResult(
             status = status,
             message = response["message"]?.toString(),
@@ -118,7 +110,6 @@ class PostsRepositoryImpl(
         val response = remote.loadComments(postId)
         val status = response["status"]?.toString()
             ?: if (response.containsKey("comments")) "success" else "error"
-
         return CommentsResult(
             status = status,
             message = response["message"]?.toString(),
@@ -150,28 +141,23 @@ class PostsRepositoryImpl(
     }
 
     override suspend fun deleteComment(commentId: Int): ActionResult {
-        val response = remote.deleteComment(commentId)
-        return actionResult(response)
+        return actionResult(remote.deleteComment(commentId))
     }
 
     override suspend fun likePost(postId: Int): Boolean {
-        val response = remote.likePost(postId)
-        return isActionSuccessful(response)
+        return isActionSuccessful(remote.likePost(postId))
     }
 
     override suspend fun dislikePost(postId: Int): Boolean {
-        val response = remote.dislikePost(postId)
-        return isActionSuccessful(response)
+        return isActionSuccessful(remote.dislikePost(postId))
     }
 
     override suspend fun setReaction(postId: Int, reaction: String): Boolean {
-        val response = remote.setReaction(postId, reaction)
-        return isActionSuccessful(response)
+        return isActionSuccessful(remote.setReaction(postId, reaction))
     }
 
     override suspend fun unsetReaction(postId: Int, reaction: String): Boolean {
-        val response = remote.unsetReaction(postId, reaction)
-        return isActionSuccessful(response)
+        return isActionSuccessful(remote.unsetReaction(postId, reaction))
     }
 
     override suspend fun votePostPoll(postId: Int, optionIds: List<Int>): PollVoteResult {
@@ -181,7 +167,6 @@ class PostsRepositoryImpl(
             "success", "ok", "200", null, "" -> "success"
             else -> "error"
         }
-
         return PollVoteResult(
             status = normalized,
             message = response["message"]?.toString(),
@@ -189,70 +174,145 @@ class PostsRepositoryImpl(
         )
     }
 
-    override suspend fun deletePost(postId: Int): ActionResult {
-        val response = remote.deletePost(postId)
-        return actionResult(response)
-    }
+    override suspend fun deletePost(postId: Int): ActionResult = actionResult(remote.deletePost(postId))
+    override suspend fun restorePost(postId: Int): ActionResult = actionResult(remote.restorePost(postId))
+    override suspend fun deletePostForever(postId: Int): ActionResult = actionResult(remote.deletePostForever(postId))
+    override suspend fun addPostToArchive(postId: Int): ActionResult = actionResult(remote.addPostToArchive(postId))
+    override suspend fun removePostFromArchive(postId: Int): ActionResult = actionResult(remote.removePostFromArchive(postId))
+    override suspend fun blockProfile(username: String): ActionResult = actionResult(remote.blockProfile(username))
+    override suspend fun unblockProfile(username: String): ActionResult = actionResult(remote.unblockProfile(username))
 
-    override suspend fun restorePost(postId: Int): ActionResult {
-        val response = remote.restorePost(postId)
-        return actionResult(response)
-    }
-
-    override suspend fun deletePostForever(postId: Int): ActionResult {
-        val response = remote.deletePostForever(postId)
-        return actionResult(response)
-    }
-
-    override suspend fun addPostToArchive(postId: Int): ActionResult {
-        val response = remote.addPostToArchive(postId)
-        return actionResult(response)
-    }
-
-    override suspend fun removePostFromArchive(postId: Int): ActionResult {
-        val response = remote.removePostFromArchive(postId)
-        return actionResult(response)
-    }
-
-    override suspend fun blockProfile(username: String): ActionResult {
-        val response = remote.blockProfile(username)
-        return actionResult(response)
-    }
-
-    override suspend fun unblockProfile(username: String): ActionResult {
-        val response = remote.unblockProfile(username)
-        return actionResult(response)
-    }
+    // === Images ===
 
     override suspend fun downloadImage(asset: PostImageAsset, preferLossless: Boolean): ByteArray? {
-        val response = remote.downloadImage(asset, preferLossless)
-        val statusCode = response["status"].asInt(-1)
-        if (statusCode != 200) {
-            return null
+        // 1. Neo: через file_id
+        val fileId = asset.fileId
+        if (fileId != null && fileId > 0) {
+            val variants = if (preferLossless) listOf("original", "webp", "avif")
+            else listOf("webp", "avif", "original")
+            for (variant in variants) {
+                val bytes = downloadStorageBytes(fileId, variant)
+                if (bytes != null && bytes.isNotEmpty()) return bytes
+            }
         }
 
-        val preferred = if (preferLossless) {
-            response["file"].asMap()
-        } else {
-            response["simple"].asMap() ?: response["file"].asMap()
+        // 2. Fallback: path/file
+        if (asset.path.isNotBlank() && asset.file.isNotBlank()) {
+            val response = runCatching { remote.downloadImage(asset, preferLossless) }.getOrNull()
+                ?: return null
+            val statusCode = response["status"].asInt(-1)
+            if (statusCode != 200) return null
+            val preferred = if (preferLossless) {
+                response["file"].asMap()
+            } else {
+                response["simple"].asMap() ?: response["file"].asMap()
+            }
+            return preferred?.get("buffer") as? ByteArray
+                ?: response["buffer"] as? ByteArray
         }
 
-        return preferred?.get("buffer") as? ByteArray
+        return null
     }
 
-    override suspend fun downloadFileChunk(path: String, file: String, offset: Long): DownloadChunkResult {
-        val response = remote.downloadFileChunk(
-            path = path,
-            file = file,
-            offset = offset
-        )
+    private suspend fun downloadStorageBytes(fileId: Int, variant: String): ByteArray? {
+        val out = ByteArrayOutputStream()
+        var offset = 0L
+        var isLast = false
+        var iterations = 0
 
+        while (!isLast && iterations < 4096) {
+            iterations++
+            val response = runCatching {
+                remote.downloadStorageChunk(fileId, offset, variant)
+            }.getOrNull() ?: return null
+
+            val chunk = extractBuffer(response) ?: return null
+            if (chunk.isEmpty()) break
+
+            out.write(chunk)
+
+            val responseOffset = response["offset"].asLong(-1L) ?: -1L
+            offset = if (responseOffset >= 0) responseOffset + chunk.size else offset + chunk.size
+
+            val total = response["total_size"].asLong(-1L) ?: -1L
+            if (total > 0 && offset >= total) isLast = true
+            if (response["is_last_chunk"].asBoolean()) isLast = true
+            if (chunk.size < 1024 && total <= 0) isLast = true
+        }
+
+        return out.toByteArray().takeIf { it.isNotEmpty() }
+    }
+
+    // === Files (path/file) ===
+
+    override suspend fun downloadFileChunk(
+        path: String,
+        file: String,
+        offset: Long
+    ): DownloadChunkResult {
+        val response = remote.downloadFileChunk(path, file, offset)
         return DownloadChunkResult(
             statusCode = response["status"].asInt(-1) ?: -1,
-            buffer = response["buffer"] as? ByteArray ?: ByteArray(0),
+            buffer = extractBuffer(response) ?: ByteArray(0),
             totalSize = response["total_size"].asLong(0L) ?: 0L,
+            offset = response["offset"].asLong(offset) ?: offset,
             isLastChunk = response["is_last_chunk"].asBoolean()
         )
+    }
+
+    // === Files (Neo, file_id String) ===
+
+    override suspend fun downloadFileByIdChunk(
+        fileId: String,
+        offset: Long
+    ): DownloadChunkResult {
+        val response = remote.downloadFileByIdChunk(fileId, offset)
+        return DownloadChunkResult(
+            statusCode = response["status"].asInt(-1) ?: -1,
+            buffer = extractBuffer(response) ?: ByteArray(0),
+            totalSize = response["total_size"].asLong(0L) ?: 0L,
+            offset = response["offset"].asLong(offset) ?: offset,
+            isLastChunk = response["is_last_chunk"].asBoolean()
+        )
+    }
+
+    override suspend fun getFileData(fileId: Int, variant: String): Map<String, Any?>? {
+        return runCatching { remote.getFileData(fileId, variant) }.getOrNull()
+    }
+
+    // === Helpers ===
+
+    private fun extractBuffer(response: Map<String, Any?>?): ByteArray? {
+        if (response == null) return null
+        val raw = response["buffer"]
+        return when (raw) {
+            is ByteArray -> raw
+            is List<*> -> {
+                val bytes = ByteArray(raw.size)
+                for (i in raw.indices) {
+                    val v = raw[i]
+                    if (v !is Number) return null
+                    bytes[i] = v.toByte()
+                }
+                bytes
+            }
+            else -> {
+                val nested = response["file"].asMap() ?: response["data"].asMap()
+                when (val nestedBuffer = nested?.get("buffer")) {
+                    is ByteArray -> nestedBuffer
+                    is List<*> -> {
+                        val bytes = ByteArray(nestedBuffer.size)
+                        for (i in nestedBuffer.indices) {
+                            val v = nestedBuffer[i]
+                            if (v !is Number) return null
+                            bytes[i] = v.toByte()
+                        }
+                        bytes
+                    }
+                    else -> null
+                }
+            }
+        }
     }
 
     private fun actionResult(response: Map<String, Any?>): ActionResult {
