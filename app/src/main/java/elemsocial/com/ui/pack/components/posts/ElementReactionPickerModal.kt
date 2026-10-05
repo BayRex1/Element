@@ -111,7 +111,8 @@ fun ElementReactionPickerModal(
                     contentPadding = PaddingValues(2.dp)
                 ) {
                     items(emojis, key = { it.unified }) { emoji ->
-                        val isSet = currentReactions.userReactions.contains(emoji.unified)
+                        val isSet = currentReactions.userReactions
+                            .any { it.equals(emoji.unified, ignoreCase = true) }
                         EmojiCell(
                             emoji = emoji,
                             selected = isSet,
