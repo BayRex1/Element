@@ -191,7 +191,6 @@ class HomeGateway(
             return cached
         }
 
-        // Neo: по file_id
         val id = video.fileId
         if (id != null && id > 0) {
             val payload = downloadStorageFileBytes(id, video.fileSize ?: 0L, onProgress, isCancelled)
@@ -202,7 +201,6 @@ class HomeGateway(
             return resolveCachedFile(video.cacheKey)
         }
 
-        // Старый API: path/file чанками
         if (video.path.isBlank() || video.file.isBlank()) return null
         return downloadVideoByPath(video, onProgress, isCancelled)
     }
@@ -377,8 +375,7 @@ class HomeGateway(
             if (isCancelled()) return null
 
             val response = postsRepository.downloadStorageChunk(fileId, offset, "original")
-            val chunk = extractGatewayBuffer(response)
-            if (chunk == null) return null
+            val chunk: ByteArray = extractGatewayBuffer(response) ?: return null
             if (chunk.isEmpty()) break
 
             out.write(chunk)
@@ -397,7 +394,14 @@ class HomeGateway(
     private fun extractGatewayBuffer(response: Map<String, Any?>?): ByteArray? {
         if (response == null) return null
 
-        fun convert(raw: Any?): ByteArray? = when (raw) {
+        convertToByteArray(response["buffer"])?.let { return it }
+        val nested = (response["file"] as? Map<*, *>)?.get("buffer")
+            ?: (response["data"] as? Map<*, *>)?.get("buffer")
+        return convertToByteArray(nested)
+    }
+
+    private fun convertToByteArray(raw: Any?): ByteArray? {
+        return when (raw) {
             is ByteArray -> raw
             is List<*> -> {
                 val bytes = ByteArray(raw.size)
@@ -410,11 +414,6 @@ class HomeGateway(
             }
             else -> null
         }
-
-        convert(response["buffer"])?.let { return it }
-        val nested = (response["file"] as? Map<*, *>)?.get("buffer")
-            ?: (response["data"] as? Map<*, *>)?.get("buffer")
-        return convert(nested)
     }
 
     // === Storage stats ===
