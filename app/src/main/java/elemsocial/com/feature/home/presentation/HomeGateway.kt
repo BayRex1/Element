@@ -17,9 +17,6 @@ import elemsocial.com.domain.repository.PostsRepository
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.LinkedHashMap
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -28,24 +25,18 @@ class HomeGateway(
     private val imageDiskCache: ImageDiskCache? = null
 ) {
     private companion object {
-        const val VideoChunkSizeBytes = 512 * 1024L
-        const val ParallelVideoChunkRequests = 4
-
-        // Variants для разных типов файлов
         const val VARIANT_IMAGE = "webp"
         const val VARIANT_VIDEO = "original"
         const val VARIANT_FILE = "original"
     }
 
     private val imageCache = object : LinkedHashMap<String, ByteArray>(128, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?): Boolean {
-            return size > 120
-        }
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?): Boolean =
+            size > 120
     }
 
-    suspend fun loadPosts(category: PostsCategory, startIndex: Int): FeedResult {
-        return postsRepository.loadPosts(category, startIndex)
-    }
+    suspend fun loadPosts(category: PostsCategory, startIndex: Int): FeedResult =
+        postsRepository.loadPosts(category, startIndex)
 
     suspend fun createPost(
         text: String,
@@ -56,27 +47,15 @@ class HomeGateway(
         poll: PostPoll? = null,
         clearMetadataImage: Boolean = false,
         censoringImage: Boolean = false
-    ): ActionResult {
-        return postsRepository.createPost(
-            text = text,
-            files = files,
-            songs = songs,
-            fromChannelId = fromChannelId,
-            wallUsername = wallUsername,
-            poll = poll,
-            clearMetadataImage = clearMetadataImage,
-            censoringImage = censoringImage
-        )
-    }
+    ): ActionResult = postsRepository.createPost(
+        text, files, songs, fromChannelId, wallUsername, poll, clearMetadataImage, censoringImage
+    )
 
-    suspend fun editPost(postId: Int, text: String): ActionResult {
-        return postsRepository.editPost(postId = postId, text = text)
-    }
+    suspend fun editPost(postId: Int, text: String): ActionResult =
+        postsRepository.editPost(postId, text)
 
     suspend fun loadOnlineUsers(): List<OnlineUser> = postsRepository.loadOnlineUsers()
-
     suspend fun loadPost(postId: Int): PostDetailsResult = postsRepository.loadPost(postId)
-
     suspend fun loadComments(postId: Int): CommentsResult = postsRepository.loadComments(postId)
 
     suspend fun addComment(
@@ -84,18 +63,10 @@ class HomeGateway(
         text: String,
         replyToCommentId: Int? = null,
         files: List<UploadFilePayload> = emptyList()
-    ): ActionResult {
-        return postsRepository.addComment(
-            postId = postId,
-            text = text,
-            replyToCommentId = replyToCommentId,
-            files = files
-        )
-    }
+    ): ActionResult = postsRepository.addComment(postId, text, replyToCommentId, files)
 
     suspend fun deleteComment(commentId: Int): ActionResult =
         postsRepository.deleteComment(commentId)
-
     suspend fun likePost(postId: Int): Boolean = postsRepository.likePost(postId)
     suspend fun dislikePost(postId: Int): Boolean = postsRepository.dislikePost(postId)
     suspend fun setReaction(postId: Int, reaction: String): Boolean =
@@ -121,49 +92,49 @@ class HomeGateway(
 
     suspend fun loadImageBytes(asset: PostImageAsset): ByteArray? {
         if (asset.isEmpty) return null
-
         val key = asset.cacheKey
-        synchronized(imageCache) {
-            imageCache[key]?.let { return it }
-        }
+        if (key.isBlank()) return null
+
+        synchronized(imageCache) { imageCache[key]?.let { return it } }
 
         val persisted: ByteArray? = imageDiskCache?.let { cache ->
-            withContext(Dispatchers.IO) { cache.read(key) }
+            withContext(Dispatchers.IO) {
+                runCatching { cache.read(key) }.getOrNull()
+            }
         }
         if (persisted != null && persisted.isNotEmpty()) {
-            synchronized(imageCache) {
-                imageCache[key] = persisted
-            }
+            synchronized(imageCache) { imageCache[key] = persisted }
             return persisted
         }
 
-        val downloaded = postsRepository.downloadImage(asset, preferLossless = false)
-            ?: postsRepository.downloadImage(asset, preferLossless = true)
-            ?: return null
+        val downloaded = runCatching {
+            postsRepository.downloadImage(asset, preferLossless = false)
+                ?: postsRepository.downloadImage(asset, preferLossless = true)
+        }.getOrNull() ?: return null
 
-        synchronized(imageCache) {
-            imageCache[key] = downloaded
-        }
+        if (downloaded.isEmpty()) return null
+
+        synchronized(imageCache) { imageCache[key] = downloaded }
         imageDiskCache?.let { cache ->
-            withContext(Dispatchers.IO) { cache.write(key, downloaded) }
+            withContext(Dispatchers.IO) {
+                runCatching { cache.write(key, downloaded) }
+            }
         }
         return downloaded
     }
 
     suspend fun evictImage(asset: PostImageAsset?) {
         val key = asset?.cacheKey?.takeIf { it.isNotBlank() } ?: return
-        synchronized(imageCache) {
-            imageCache.remove(key)
-        }
+        synchronized(imageCache) { imageCache.remove(key) }
         imageDiskCache?.let { cache ->
-            withContext(Dispatchers.IO) { cache.remove(key) }
+            withContext(Dispatchers.IO) { runCatching { cache.remove(key) } }
         }
     }
 
     suspend fun resolveCachedFile(cacheKey: String): File? {
         if (cacheKey.isBlank()) return null
         val cache = imageDiskCache ?: return null
-        return withContext(Dispatchers.IO) { cache.resolveFile(cacheKey) }
+        return withContext(Dispatchers.IO) { runCatching { cache.resolveFile(cacheKey) }.getOrNull() }
     }
 
     // === Videos ===
@@ -180,8 +151,8 @@ class HomeGateway(
             return cached
         }
 
-        val id = video.fileId
-        if (id == null || id <= 0) return null
+        val id = video.fileId ?: return null
+        if (id <= 0) return null
 
         val payload = downloadStorageFileBytes(
             fileId = id,
@@ -192,12 +163,12 @@ class HomeGateway(
         ) ?: return null
 
         imageDiskCache?.let { cache ->
-            withContext(Dispatchers.IO) { cache.write(video.cacheKey, payload) }
+            withContext(Dispatchers.IO) { runCatching { cache.write(video.cacheKey, payload) } }
         }
         return resolveCachedFile(video.cacheKey)
     }
 
-    // === Files (documents in posts) ===
+    // === Files ===
 
     suspend fun loadFile(
         file: PostFile,
@@ -223,12 +194,10 @@ class HomeGateway(
         ) ?: return null
 
         imageDiskCache?.let { cache ->
-            withContext(Dispatchers.IO) { cache.write(file.cacheKey, payload) }
+            withContext(Dispatchers.IO) { runCatching { cache.write(file.cacheKey, payload) } }
         }
         return resolveCachedFile(file.cacheKey)
     }
-
-    // === Storage (Neo: file_id Int) ===
 
     private suspend fun downloadStorageFileBytes(
         fileId: Int,
@@ -290,7 +259,6 @@ class HomeGateway(
             }
             return bytes
         }
-
         return null
     }
 
@@ -311,9 +279,7 @@ class HomeGateway(
             while (iterator.hasNext()) {
                 val entry = iterator.next()
                 val category = ImageDiskCache.resolveCategory(entry.key)
-                if (categories.contains(category)) {
-                    iterator.remove()
-                }
+                if (categories.contains(category)) iterator.remove()
             }
         }
 
