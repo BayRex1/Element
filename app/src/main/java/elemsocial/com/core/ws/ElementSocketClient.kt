@@ -106,14 +106,10 @@ class ElementSocketClient(
         }
 
         urls = prepared
-        if (urlIndex !in urls.indices) {
-            urlIndex = 0
-        }
+        if (urlIndex !in urls.indices) urlIndex = 0
     }
 
-    fun connect(url: String) {
-        connect(listOf(url))
-    }
+    fun connect(url: String) = connect(listOf(url))
 
     fun connect(urls: List<String>) {
         configureReconnectUrls(urls)
@@ -124,18 +120,14 @@ class ElementSocketClient(
         if (_connectionState.value == ConnectionState.Connecting ||
             _connectionState.value == ConnectionState.Handshaking ||
             _connectionState.value == ConnectionState.Ready
-        ) {
-            return
-        }
+        ) return
 
         val targetUrl = getCurrentUrl() ?: return
         startSocketConnection(targetUrl)
     }
 
     fun disconnect(clearQueue: Boolean = false, disableReconnect: Boolean = true) {
-        if (disableReconnect) {
-            autoReconnectEnabled = false
-        }
+        if (disableReconnect) autoReconnectEnabled = false
         cancelReconnect()
 
         webSocket?.close(1000, "Client disconnect")
@@ -152,27 +144,19 @@ class ElementSocketClient(
     }
 
     fun setAuthorizationSessionKey(sessionKey: String?) {
-        authorizationSessionKey = sessionKey
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
+        authorizationSessionKey = sessionKey?.trim()?.takeIf { it.isNotBlank() }
     }
 
-    suspend fun connectAndAwaitReady(url: String, timeoutMs: Long = 20_000): Boolean {
-        return connectAndAwaitReady(listOf(url), timeoutMs)
-    }
+    suspend fun connectAndAwaitReady(url: String, timeoutMs: Long = 20_000): Boolean =
+        connectAndAwaitReady(listOf(url), timeoutMs)
 
     suspend fun connectAndAwaitReady(urls: List<String>, timeoutMs: Long = 20_000): Boolean {
-        if (isSocketReadyToSend()) {
-            return true
-        }
+        if (isSocketReadyToSend()) return true
 
         connect(urls)
 
         val result = withTimeoutOrNull(timeoutMs) {
-            while (
-                !isSocketReadyToSend() &&
-                _connectionState.value != ConnectionState.Error
-            ) {
+            while (!isSocketReadyToSend() && _connectionState.value != ConnectionState.Error) {
                 delay(120)
             }
             isSocketReadyToSend()
@@ -182,9 +166,7 @@ class ElementSocketClient(
     }
 
     suspend fun sendRequest(payload: Map<String, Any?>, timeoutMs: Long = 60_000): Map<String, Any?> {
-        if (isSocketReadyToSend()) {
-            return sendNowAwait(payload, timeoutMs)
-        }
+        if (isSocketReadyToSend()) return sendNowAwait(payload, timeoutMs)
 
         if (!autoReconnectEnabled) {
             throw IllegalStateException("Socket is not ready and auto-reconnect is disabled")
@@ -201,13 +183,12 @@ class ElementSocketClient(
         )
 
         queuedRequests.add(queued)
-        log("Request queued until reconnect: type=${payload["type"]}, action=${payload["action"]}")
+        log("Request queued: type=${payload["type"]}, action=${payload["action"]}")
 
-        if (_connectionState.value == ConnectionState.Disconnected || _connectionState.value == ConnectionState.Error) {
-            val nextUrl = getCurrentUrl()
-            if (nextUrl != null) {
-                startSocketConnection(nextUrl)
-            }
+        if (_connectionState.value == ConnectionState.Disconnected ||
+            _connectionState.value == ConnectionState.Error
+        ) {
+            getCurrentUrl()?.let { startSocketConnection(it) }
         }
 
         processQueuedRequests()
@@ -219,7 +200,7 @@ class ElementSocketClient(
         } catch (error: TimeoutCancellationException) {
             queued.deferred.cancel(error)
             queuedRequests.remove(queued)
-            throw IOException("Timed out while waiting queued request to be delivered")
+            throw IOException("Timed out while waiting queued request")
         }
     }
 
@@ -244,10 +225,7 @@ class ElementSocketClient(
                 log("Socket connected")
                 reconnectAttempts = 0
                 runCatching {
-                    if (keyPair == null) {
-                        keyPair = CryptoEngine.generateRsaKeyPair()
-                    }
-
+                    if (keyPair == null) keyPair = CryptoEngine.generateRsaKeyPair()
                     val publicPem = CryptoEngine.publicKeyToPem(keyPair!!.public)
                     val exchangePayload = JSONObject()
                         .put("type", "key_exchange")
@@ -260,38 +238,24 @@ class ElementSocketClient(
                 }.onFailure { error ->
                     _connectionState.value = ConnectionState.Error
                     log("Handshake init error: ${error.message}")
-                    handleTransportLoss(
-                        fallbackState = ConnectionState.Error,
-                        throwable = error
-                    )
+                    handleTransportLoss(ConnectionState.Error, error)
                 }
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 if (!isCurrentSocket(webSocket)) return
-                runCatching {
-                    handleTextMessage(webSocket, text)
-                }.onFailure { error ->
-                    _connectionState.value = ConnectionState.Error
-                    log("Text message error: ${error.message}")
-                }
+                runCatching { handleTextMessage(webSocket, text) }
+                    .onFailure { log("Text error (ignored): ${it.message}") }
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
                 if (!isCurrentSocket(webSocket)) return
-                runCatching {
-                    handleBinaryMessage(bytes.toByteArray())
-                }.onFailure { error ->
-                    _connectionState.value = ConnectionState.Error
-                    log("Binary message error: ${error.message}")
-                }
+                runCatching { handleBinaryMessage(bytes.toByteArray()) }
+                    .onFailure { log("Binary error (ignored): ${it.message}") }
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                if (!isCurrentSocket(webSocket)) {
-                    webSocket.close(code, reason)
-                    return
-                }
+                if (!isCurrentSocket(webSocket)) { webSocket.close(code, reason); return }
                 log("Socket closing: [$code] $reason")
                 webSocket.close(code, reason)
             }
@@ -299,19 +263,13 @@ class ElementSocketClient(
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 if (!isCurrentSocket(webSocket)) return
                 log("Socket closed: [$code] $reason")
-                handleTransportLoss(
-                    fallbackState = ConnectionState.Disconnected,
-                    throwable = IOException("Socket closed: [$code] $reason")
-                )
+                handleTransportLoss(ConnectionState.Disconnected, IOException("Socket closed"))
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 if (!isCurrentSocket(webSocket)) return
                 log("Socket failure: ${t.message ?: "unknown"}")
-                handleTransportLoss(
-                    fallbackState = ConnectionState.Error,
-                    throwable = t
-                )
+                handleTransportLoss(ConnectionState.Error, t)
             }
         })
     }
@@ -324,9 +282,7 @@ class ElementSocketClient(
         }
 
         val rayId = generateRayId(16)
-        val packet = payload.toMutableMap().apply {
-            put("ray_id", rayId)
-        }
+        val packet = payload.toMutableMap().apply { put("ray_id", rayId) }
 
         val encoded = MsgPackCodec.encodeMap(packet)
         val encrypted = CryptoEngine.aesEncryptWithIvPrefix(encoded, outboundAes)
@@ -339,9 +295,7 @@ class ElementSocketClient(
         }
 
         return try {
-            withTimeout(timeoutMs) {
-                deferred.await()
-            }
+            withTimeout(timeoutMs) { deferred.await() }
         } finally {
             pendingRequests.remove(rayId, deferred)
         }
@@ -368,23 +322,19 @@ class ElementSocketClient(
             "success", "ok", "200", null, "" -> true
             else -> false
         }
-
         return success && !accountNotFound
     }
 
     private fun handleTextMessage(webSocket: WebSocket, text: String) {
         val json = JSONObject(text)
         val type = json.optString("type")
-
         if (type != "key_exchange") {
             log("Unexpected text message: $text")
             return
         }
 
         val serverKey = json.optString("key")
-        if (serverKey.isBlank()) {
-            error("Server RSA key is empty")
-        }
+        if (serverKey.isBlank()) error("Server RSA key is empty")
 
         serverRsaPublicPem = serverKey
 
@@ -397,7 +347,6 @@ class ElementSocketClient(
                 "key" to CryptoEngine.bytesToBase64(nextClientAes)
             )
         )
-
         val encryptedPayload = CryptoEngine.rsaEncrypt(rsaPayload, serverKey)
         webSocket.send(encryptedPayload.toByteString())
         log("Client AES key sent via RSA")
@@ -428,14 +377,8 @@ class ElementSocketClient(
 
             scope.launch {
                 try {
-                    val authorized = runCatching {
-                        authorizeSession(sessionKey)
-                    }.getOrDefault(false)
-                    if (authorized) {
-                        log("Session authorization restored")
-                    } else {
-                        log("Session authorization restore failed")
-                    }
+                    val authorized = runCatching { authorizeSession(sessionKey) }.getOrDefault(false)
+                    log(if (authorized) "Session authorized" else "Session auth failed")
                 } finally {
                     awaitingSessionAuthorization = false
                     processQueuedRequests()
@@ -459,34 +402,23 @@ class ElementSocketClient(
     }
 
     private fun emitEvent(payload: Map<String, Any?>) {
-        scope.launch {
-            _events.emit(payload)
-        }
+        scope.launch { _events.emit(payload) }
     }
 
     private fun log(text: String) {
-        scope.launch {
-            _logs.emit(text)
-        }
+        scope.launch { _logs.emit(text) }
     }
 
     private fun handleTransportLoss(fallbackState: ConnectionState, throwable: Throwable) {
-        cleanupConnectionState(state = fallbackState, throwable = throwable)
-
-        if (!autoReconnectEnabled) {
-            return
-        }
+        cleanupConnectionState(fallbackState, throwable)
+        if (!autoReconnectEnabled) return
         scheduleReconnect()
     }
 
     private fun scheduleReconnect() {
-        if (reconnectJob != null) {
-            return
-        }
-
-        val targetUrl = getCurrentUrl()
-        if (targetUrl == null) {
-            log("Reconnect skipped: no websocket URL configured")
+        if (reconnectJob != null) return
+        val targetUrl = getCurrentUrl() ?: run {
+            log("Reconnect skipped: no url")
             return
         }
 
@@ -501,9 +433,8 @@ class ElementSocketClient(
             delay(delayMs)
             reconnectJob = null
             nextUrl()
-            val next = getCurrentUrl()
-            if (next != null && autoReconnectEnabled) {
-                startSocketConnection(next)
+            getCurrentUrl()?.let {
+                if (autoReconnectEnabled) startSocketConnection(it)
             }
         }
     }
@@ -514,12 +445,8 @@ class ElementSocketClient(
     }
 
     private fun processQueuedRequests() {
-        if (!isSocketReadyToSend()) {
-            return
-        }
-        if (!queueProcessing.compareAndSet(false, true)) {
-            return
-        }
+        if (!isSocketReadyToSend()) return
+        if (!queueProcessing.compareAndSet(false, true)) return
 
         try {
             while (true) {
@@ -528,48 +455,40 @@ class ElementSocketClient(
             }
         } finally {
             queueProcessing.set(false)
-            if (queuedRequests.isNotEmpty() && isSocketReadyToSend()) {
-                processQueuedRequests()
-            }
+            if (queuedRequests.isNotEmpty() && isSocketReadyToSend()) processQueuedRequests()
         }
     }
 
     private fun dispatchQueuedRequest(request: QueuedRequest) {
         scope.launch {
-            if (request.deferred.isCancelled || request.deferred.isCompleted) {
-                return@launch
-            }
+            if (request.deferred.isCancelled || request.deferred.isCompleted) return@launch
 
-            runCatching {
-                sendNowAwait(request.payload, request.timeoutMs)
-            }.onSuccess { response ->
-                request.deferred.complete(response)
-            }.onFailure { error ->
-                if (isTransientSendError(error) && autoReconnectEnabled && !request.deferred.isCancelled) {
-                    queuedRequests.add(request)
-                    if (_connectionState.value == ConnectionState.Disconnected || _connectionState.value == ConnectionState.Error) {
-                        scheduleReconnect()
+            runCatching { sendNowAwait(request.payload, request.timeoutMs) }
+                .onSuccess { request.deferred.complete(it) }
+                .onFailure { error ->
+                    if (isTransientSendError(error) && autoReconnectEnabled && !request.deferred.isCancelled) {
+                        queuedRequests.add(request)
+                        if (_connectionState.value == ConnectionState.Disconnected ||
+                            _connectionState.value == ConnectionState.Error
+                        ) {
+                            scheduleReconnect()
+                        }
+                        return@launch
                     }
-                    return@launch
+                    request.deferred.completeExceptionally(error)
                 }
-                request.deferred.completeExceptionally(error)
-            }
         }
     }
 
     private fun isTransientSendError(error: Throwable): Boolean {
-        if (error is IllegalStateException && error.message?.contains("not ready", ignoreCase = true) == true) {
-            return true
-        }
+        if (error is IllegalStateException && error.message?.contains("not ready", true) == true) return true
         return error is IOException
     }
 
     private fun clearQueuedRequests(reason: Throwable) {
         while (true) {
             val request = queuedRequests.poll() ?: break
-            if (!request.deferred.isCompleted) {
-                request.deferred.completeExceptionally(reason)
-            }
+            if (!request.deferred.isCompleted) request.deferred.completeExceptionally(reason)
         }
     }
 
@@ -583,9 +502,7 @@ class ElementSocketClient(
 
         val pendingException = throwable ?: IOException("Connection closed")
         pendingRequests.forEach { (_, deferred) ->
-            if (!deferred.isCompleted) {
-                deferred.completeExceptionally(pendingException)
-            }
+            if (!deferred.isCompleted) deferred.completeExceptionally(pendingException)
         }
         pendingRequests.clear()
 
@@ -599,43 +516,31 @@ class ElementSocketClient(
         clientAesKey = null
         serverAesKey = null
     }
-    
 
-    private fun isSocketReadyToSend(): Boolean {
-        return _connectionState.value == ConnectionState.Ready &&
+    private fun isSocketReadyToSend(): Boolean =
+        _connectionState.value == ConnectionState.Ready &&
             webSocket != null &&
             serverAesKey != null &&
             clientAesKey != null &&
             !awaitingSessionAuthorization
-    }
 
-    private fun isCurrentSocket(socket: WebSocket): Boolean {
-        return webSocket === socket
-    }
+    private fun isCurrentSocket(socket: WebSocket): Boolean = webSocket === socket
 
     private fun getCurrentUrl(): String? {
-        if (urls.isEmpty()) {
-            return null
-        }
-        if (urlIndex !in urls.indices) {
-            urlIndex = 0
-        }
+        if (urls.isEmpty()) return null
+        if (urlIndex !in urls.indices) urlIndex = 0
         return urls[urlIndex]
     }
 
     private fun nextUrl() {
-        if (urls.isEmpty()) {
-            return
-        }
+        if (urls.isEmpty()) return
         urlIndex = (urlIndex + 1) % urls.size
     }
 
     private fun generateRayId(length: Int): String {
         val alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         return buildString(length) {
-            repeat(length) {
-                append(alphabet[Random.nextInt(alphabet.length)])
-            }
+            repeat(length) { append(alphabet[Random.nextInt(alphabet.length)]) }
         }
     }
 }
