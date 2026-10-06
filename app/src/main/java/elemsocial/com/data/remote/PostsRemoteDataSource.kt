@@ -33,30 +33,24 @@ class PostsRemoteDataSource(
             payload["wall"] = mapOf("username" to wallUsername)
         }
         return socketClient.sendRequest(
-            mapOf(
-                "type" to "social",
-                "action" to "posts/add",
-                "payload" to payload
-            )
+            mapOf("type" to "social", "action" to "posts/add", "payload" to payload)
         )
     }
 
-    suspend fun editPost(postId: Int, text: String): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun editPost(postId: Int, text: String): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "social",
                 "action" to "posts/edit",
                 "payload" to mapOf("post_id" to postId, "text" to text)
             )
         )
-    }
 
-    suspend fun loadOnlineUsers(): Map<String, Any?> {
-        return socketClient.sendRequest(mapOf("type" to "social", "action" to "get_online_users"))
-    }
+    suspend fun loadOnlineUsers(): Map<String, Any?> =
+        socketClient.sendRequest(mapOf("type" to "social", "action" to "get_online_users"))
 
-    suspend fun loadPosts(category: PostsCategory, startIndex: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun loadPosts(category: PostsCategory, startIndex: Int): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "social",
                 "action" to "load_posts",
@@ -66,23 +60,20 @@ class PostsRemoteDataSource(
                 )
             )
         )
-    }
 
-    suspend fun loadPost(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun loadPost(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf("type" to "social", "action" to "load_post", "pid" to postId)
         )
-    }
 
-    suspend fun loadComments(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun loadComments(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "social",
                 "action" to "comments/load",
                 "payload" to mapOf("post_id" to postId)
             )
         )
-    }
 
     suspend fun addComment(
         postId: Int,
@@ -101,107 +92,122 @@ class PostsRemoteDataSource(
         )
     }
 
-    suspend fun deleteComment(commentId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun deleteComment(commentId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "social",
                 "action" to "comments/delete",
                 "payload" to mapOf("comment_id" to commentId)
             )
         )
-    }
 
-    suspend fun likePost(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf("type" to "social", "action" to "posts/like", "payload" to mapOf("post_id" to postId))
+    suspend fun likePost(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "posts/like",
+                "payload" to mapOf("post_id" to postId)
+            )
         )
-    }
 
-    suspend fun dislikePost(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf("type" to "social", "action" to "posts/dislike", "payload" to mapOf("post_id" to postId))
+    suspend fun dislikePost(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "posts/dislike",
+                "payload" to mapOf("post_id" to postId)
+            )
         )
-    }
 
-    suspend fun setReaction(postId: Int, reaction: String): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun setReaction(postId: Int, reaction: String): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "social",
                 "action" to "post/set_reaction",
                 "payload" to mapOf("post_id" to postId, "reaction" to reaction)
             )
         )
-    }
 
-    suspend fun unsetReaction(postId: Int, reaction: String): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun unsetReaction(postId: Int, reaction: String): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "social",
                 "action" to "post/unset_reaction",
                 "payload" to mapOf("post_id" to postId, "reaction" to reaction)
             )
         )
-    }
 
-    suspend fun votePostPoll(postId: Int, optionIds: List<Int>): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun votePostPoll(postId: Int, optionIds: List<Int>): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "social",
                 "action" to "posts/vote",
                 "payload" to mapOf("post_id" to postId, "option_ids" to optionIds)
             )
         )
-    }
 
-    suspend fun deletePost(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf("type" to "social", "action" to "posts/delete", "payload" to mapOf("post_id" to postId))
+    suspend fun deletePost(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "posts/delete",
+                "payload" to mapOf("post_id" to postId)
+            )
         )
-    }
 
-    suspend fun restorePost(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf("type" to "social", "action" to "posts/restore", "payload" to mapOf("post_id" to postId))
+    suspend fun restorePost(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "posts/restore",
+                "payload" to mapOf("post_id" to postId)
+            )
         )
-    }
 
-    suspend fun deletePostForever(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf("type" to "social", "action" to "posts/delete_forever", "payload" to mapOf("post_id" to postId))
+    suspend fun deletePostForever(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "posts/delete_forever",
+                "payload" to mapOf("post_id" to postId)
+            )
         )
-    }
 
-    suspend fun addPostToArchive(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf("type" to "social", "action" to "posts/add_to_archive", "payload" to mapOf("post_id" to postId))
+    suspend fun addPostToArchive(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "posts/add_to_archive",
+                "payload" to mapOf("post_id" to postId)
+            )
         )
-    }
 
-    suspend fun removePostFromArchive(postId: Int): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf("type" to "social", "action" to "posts/remove_from_archive", "payload" to mapOf("post_id" to postId))
+    suspend fun removePostFromArchive(postId: Int): Map<String, Any?> =
+        socketClient.sendRequest(
+            mapOf(
+                "type" to "social",
+                "action" to "posts/remove_from_archive",
+                "payload" to mapOf("post_id" to postId)
+            )
         )
-    }
 
-    suspend fun blockProfile(username: String): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun blockProfile(username: String): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf("type" to "social", "action" to "block_profile", "username" to username)
         )
-    }
 
-    suspend fun unblockProfile(username: String): Map<String, Any?> {
-        return socketClient.sendRequest(
+    suspend fun unblockProfile(username: String): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf("type" to "social", "action" to "unblock_profile", "username" to username)
         )
-    }
 
-    // === Images ===
+    // === Legacy images (path/file) ===
 
     suspend fun downloadImage(
         asset: PostImageAsset,
         preferLossless: Boolean = false
-    ): Map<String, Any?> {
-        return socketClient.sendRequest(
+    ): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "download",
                 "action" to "image",
@@ -214,73 +220,31 @@ class PostsRemoteDataSource(
             ),
             timeoutMs = 30_000
         )
-    }
 
-    // === Files (path/file, старый API) ===
+    // === Legacy files (path/file, chunks) ===
 
     suspend fun downloadFileChunk(
         path: String,
         file: String,
         offset: Long
-    ): Map<String, Any?> {
-        return socketClient.sendRequest(
+    ): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "download",
                 "action" to "file",
-                "payload" to mapOf(
-                    "path" to path,
-                    "file" to file,
-                    "offset" to offset
-                )
+                "payload" to mapOf("path" to path, "file" to file, "offset" to offset)
             ),
             timeoutMs = 30_000
         )
-    }
 
-    // === Files (Neo, file_id строка) ===
-
-    suspend fun downloadFileByIdChunk(
-        fileId: String,
-        offset: Long
-    ): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf(
-                "type" to "download",
-                "action" to "file",
-                "payload" to mapOf(
-                    "file_id" to fileId,
-                    "offset" to offset
-                )
-            ),
-            timeoutMs = 30_000
-        )
-    }
-
-    // === Storage (Neo, file_id Int) ===
-
-    suspend fun getFileData(
-        fileId: Int,
-        variant: String = "original"
-    ): Map<String, Any?> {
-        return socketClient.sendRequest(
-            mapOf(
-                "type" to "storage",
-                "action" to "get_file_data",
-                "payload" to mapOf(
-                    "file_id" to fileId,
-                    "variant" to variant
-                )
-            ),
-            timeoutMs = 30_000
-        )
-    }
+    // === Neo storage (file_id) ===
 
     suspend fun downloadStorageChunk(
         fileId: Int,
         offset: Long,
         variant: String = "webp"
-    ): Map<String, Any?> {
-        return socketClient.sendRequest(
+    ): Map<String, Any?> =
+        socketClient.sendRequest(
             mapOf(
                 "type" to "storage",
                 "action" to "download",
@@ -292,5 +256,4 @@ class PostsRemoteDataSource(
             ),
             timeoutMs = 30_000
         )
-    }
 }
