@@ -218,29 +218,45 @@ class PostsRepositoryImpl(
     }
 
     private suspend fun downloadStorageBytes(fileId: Int, variant: String): ByteArray? {
+        val metadataResponse = runCatching {
+            remote.getStorageFileData(fileId, variant)
+        }.getOrNull() ?: return null
+
+        val fileData = metadataResponse["file_data"].asRichMap() ?: return null
+        val selected = if (variant == "original") {
+            fileData
+        } else {
+            fileData["variants"].asRichMap()?.get(variant).asRichMap() ?: return null
+        }
+
+        if (selected["variant_status"]?.toString()?.equals("processing", ignoreCase = true) == true) {
+            return null
+        }
+
+        val expectedSize = selected["size"].asLong(0L) ?: 0L
+        if (expectedSize <= 0L) return null
+
         val out = ByteArrayOutputStream()
         var offset = 0L
-        var isLast = false
         var iterations = 0
 
-        while (!isLast && iterations < 4096) {
+        while (offset < expectedSize && iterations < 4096) {
             iterations++
             val response = runCatching {
                 remote.downloadStorageChunk(fileId, offset, variant)
             }.getOrNull() ?: return null
 
             val chunk = extractBuffer(response) ?: return null
-            if (chunk.isEmpty()) break
+            if (chunk.isEmpty()) return null
+
+            val responseOffset = response["offset"].asLong(offset) ?: offset
+            if (responseOffset != offset) return null
 
             out.write(chunk)
             offset += chunk.size
-
-            val total = response["total_size"].asLong(-1L) ?: -1L
-            if (total > 0 && offset >= total) isLast = true
-            if (response["is_last_chunk"].asBoolean()) isLast = true
-            if (chunk.size < 1024 && total <= 0) isLast = true
         }
 
+        if (offset != expectedSize) return null
         return out.toByteArray().takeIf { it.isNotEmpty() }
     }
 
