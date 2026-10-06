@@ -400,12 +400,10 @@ fun MainShell(
     val navTabs = buildList {
         add(MainTab.Home)
         add(MainTab.Notifications)
+        add(MainTab.Messenger)
         add(MainTab.Music)
-        add(MainTab.Profile)
         // TODO(next-release): вернуть MainTab.Panel в нижнюю панель после релиза админ-экрана.
         // if (isAdmin) add(MainTab.Panel)
-        // TODO(next-release): вернуть MainTab.Messenger в нижнюю панель после релиза мессенджера.
-        // add(MainTab.Messenger)
     }
     val navItems = navTabs.map {
         ElementBottomNavItem(
@@ -896,19 +894,17 @@ fun MainShell(
                         }
 
                         MainTab.Messenger -> key(messengerRouteId, refreshKey(messengerRouteId)) {
-                            PlaceholderScreen(
-                                title = "Мессенджер",
-                                subtitle = "Следующий шаг: список чатов и загрузка диалога."
+                            MessengerWebScreen(
+                                sessionKey = activeAccountSessionKey,
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
 
                         MainTab.Music -> key(musicRouteId, refreshKey(musicRouteId)) {
-                            MusicScreen(
-                                homeGateway = homeGateway,
-                                topPadding = ShellContentTopPadding,
-                                bottomPadding = if (musicState.isSelected) 172.dp else ShellContentBottomPadding,
-                                modifier = Modifier.fillMaxSize(),
-                                transparencyMode = transparencyMode
+                            MessengerWebScreen(
+                                sessionKey = activeAccountSessionKey,
+                                initialPath = "/music",
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                     }
@@ -1015,35 +1011,22 @@ fun MainShell(
                     return@BottomNav
                 }
 
-                if (selectedTab == MainTab.Profile) {
-                    val ownUsername = normalizeProfileUsername(accountUsername)
-                    if (!ownUsername.isNullOrBlank()) {
-                        navigateToTab(MainTab.Profile)
-                        openProfile(ownUsername)
-                    } else {
-                        Toast
-                            .makeText(context, "Не удалось определить username аккаунта", Toast.LENGTH_SHORT)
-                            .show()
-                        navigateToTab(MainTab.Home)
-                    }
-                } else {
-                    navigateToTab(selectedTab)
+                navigateToTab(selectedTab)
                     if (selectedTab == MainTab.Notifications && notificationsCount > 0) {
                         onNotificationsCountChange(0)
                     }
                     clearSearch()
                     requestedPostId = null
                     requestedProfilePostId = null
-                    if (openedProfileUsername != null) {
-                        openedProfileUsername = null
-                    }
+                if (openedProfileUsername != null) {
+                    openedProfileUsername = null
                 }
             },
             modifier = Modifier.align(Alignment.BottomCenter),
             showShadow = currentTab != MainTab.Settings
         )
 
-        if (currentTab == MainTab.Music) {
+        if (currentTab == MainTab.Music && false) {
             MusicMiniPlayerBar(
                 homeGateway = homeGateway,
                 modifier = Modifier.align(Alignment.BottomCenter)
