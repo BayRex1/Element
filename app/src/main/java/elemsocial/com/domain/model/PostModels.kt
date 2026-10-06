@@ -122,7 +122,7 @@ data class PostFile(
     val name: String = "",
     val size: Long = 0L,
     val mimeType: String? = null,
-    val path: String = "posts/files",
+    val path: String = "",
     val file: String = ""
 ) {
     val cacheKey: String
@@ -152,7 +152,7 @@ data class PostImage(
 )
 
 data class PostVideo(
-    val path: String = "posts/videos",
+    val path: String = "",
     val file: String = "",
     val fileId: Int? = null,
     val fileName: String? = null,
