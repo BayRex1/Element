@@ -30,6 +30,11 @@ class HomeGateway(
     private companion object {
         const val VideoChunkSizeBytes = 512 * 1024L
         const val ParallelVideoChunkRequests = 4
+
+        // Variants для разных типов файлов
+        const val VARIANT_IMAGE = "webp"
+        const val VARIANT_VIDEO = "original"
+        const val VARIANT_FILE = "original"
     }
 
     private val imageCache = object : LinkedHashMap<String, ByteArray>(128, 0.75f, true) {
@@ -68,17 +73,11 @@ class HomeGateway(
         return postsRepository.editPost(postId = postId, text = text)
     }
 
-    suspend fun loadOnlineUsers(): List<OnlineUser> {
-        return postsRepository.loadOnlineUsers()
-    }
+    suspend fun loadOnlineUsers(): List<OnlineUser> = postsRepository.loadOnlineUsers()
 
-    suspend fun loadPost(postId: Int): PostDetailsResult {
-        return postsRepository.loadPost(postId)
-    }
+    suspend fun loadPost(postId: Int): PostDetailsResult = postsRepository.loadPost(postId)
 
-    suspend fun loadComments(postId: Int): CommentsResult {
-        return postsRepository.loadComments(postId)
-    }
+    suspend fun loadComments(postId: Int): CommentsResult = postsRepository.loadComments(postId)
 
     suspend fun addComment(
         postId: Int,
@@ -94,37 +93,29 @@ class HomeGateway(
         )
     }
 
-    suspend fun deleteComment(commentId: Int): ActionResult {
-        return postsRepository.deleteComment(commentId)
-    }
+    suspend fun deleteComment(commentId: Int): ActionResult =
+        postsRepository.deleteComment(commentId)
 
     suspend fun likePost(postId: Int): Boolean = postsRepository.likePost(postId)
-
     suspend fun dislikePost(postId: Int): Boolean = postsRepository.dislikePost(postId)
-
     suspend fun setReaction(postId: Int, reaction: String): Boolean =
         postsRepository.setReaction(postId, reaction)
-
     suspend fun unsetReaction(postId: Int, reaction: String): Boolean =
         postsRepository.unsetReaction(postId, reaction)
-
     suspend fun votePostPoll(postId: Int, optionIds: List<Int>): PollVoteResult =
         postsRepository.votePostPoll(postId, optionIds)
-
     suspend fun deletePost(postId: Int): ActionResult = postsRepository.deletePost(postId)
-
     suspend fun restorePost(postId: Int): ActionResult = postsRepository.restorePost(postId)
-
-    suspend fun deletePostForever(postId: Int): ActionResult = postsRepository.deletePostForever(postId)
-
-    suspend fun addPostToArchive(postId: Int): ActionResult = postsRepository.addPostToArchive(postId)
-
+    suspend fun deletePostForever(postId: Int): ActionResult =
+        postsRepository.deletePostForever(postId)
+    suspend fun addPostToArchive(postId: Int): ActionResult =
+        postsRepository.addPostToArchive(postId)
     suspend fun removePostFromArchive(postId: Int): ActionResult =
         postsRepository.removePostFromArchive(postId)
-
-    suspend fun blockProfile(username: String): ActionResult = postsRepository.blockProfile(username)
-
-    suspend fun unblockProfile(username: String): ActionResult = postsRepository.unblockProfile(username)
+    suspend fun blockProfile(username: String): ActionResult =
+        postsRepository.blockProfile(username)
+    suspend fun unblockProfile(username: String): ActionResult =
+        postsRepository.unblockProfile(username)
 
     // === Images (avatars, post images, covers) ===
 
@@ -172,16 +163,14 @@ class HomeGateway(
     suspend fun resolveCachedFile(cacheKey: String): File? {
         if (cacheKey.isBlank()) return null
         val cache = imageDiskCache ?: return null
-        return withContext(Dispatchers.IO) {
-            cache.resolveFile(cacheKey)
-        }
+        return withContext(Dispatchers.IO) { cache.resolveFile(cacheKey) }
     }
 
     // === Videos ===
 
     suspend fun loadVideoFile(
         video: PostVideo,
-        onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _ -> },
+        onProgress: (Long, Long) -> Unit = { _, _ -> },
         isCancelled: () -> Boolean = { false }
     ): File? {
         if (video.isEmpty) return null
@@ -192,95 +181,15 @@ class HomeGateway(
         }
 
         val id = video.fileId
-        if (id != null && id > 0) {
-            val payload = downloadStorageFileBytes(id, video.fileSize ?: 0L, onProgress, isCancelled)
-            if (payload == null || payload.isEmpty()) return null
-            imageDiskCache?.let { cache ->
-                withContext(Dispatchers.IO) { cache.write(video.cacheKey, payload) }
-            }
-            return resolveCachedFile(video.cacheKey)
-        }
+        if (id == null || id <= 0) return null
 
-        if (video.path.isBlank() || video.file.isBlank()) return null
-        return downloadVideoByPath(video, onProgress, isCancelled)
-    }
-
-    private suspend fun downloadVideoByPath(
-        video: PostVideo,
-        onProgress: (Long, Long) -> Unit,
-        isCancelled: () -> Boolean
-    ): File? {
-        val out = ByteArrayOutputStream()
-        var downloadedBytes = 0L
-        var totalBytes = video.fileSize ?: 0L
-
-        val firstChunk = postsRepository.downloadFileChunk(
-            path = video.path,
-            file = video.file,
-            offset = 0L
-        )
-        if (firstChunk.statusCode != 200 && firstChunk.statusCode != -1) return null
-        if (firstChunk.buffer.isEmpty() && !firstChunk.isLastChunk) return null
-
-        out.write(firstChunk.buffer)
-        downloadedBytes += firstChunk.buffer.size
-        totalBytes = maxOf(totalBytes, firstChunk.totalSize)
-        onProgress(downloadedBytes, totalBytes)
-
-        if (!firstChunk.isLastChunk) {
-            if (totalBytes > 0L) {
-                val remainingOffsets = generateSequence(VideoChunkSizeBytes) { previous ->
-                    (previous + VideoChunkSizeBytes).takeIf { it < totalBytes }
-                }.toList()
-
-                for (batch in remainingOffsets.chunked(ParallelVideoChunkRequests)) {
-                    if (isCancelled()) return null
-                    val results = coroutineScope {
-                        batch.map { offset ->
-                            async {
-                                offset to postsRepository.downloadFileChunk(
-                                    path = video.path,
-                                    file = video.file,
-                                    offset = offset
-                                )
-                            }
-                        }.awaitAll()
-                    }
-                    results.sortedBy { it.first }.forEach { (_, chunk) ->
-                        if (chunk.statusCode != 200 && chunk.statusCode != -1) return null
-                        if (chunk.buffer.isEmpty() && !chunk.isLastChunk) return null
-                        out.write(chunk.buffer)
-                        downloadedBytes += chunk.buffer.size
-                        onProgress(downloadedBytes, totalBytes)
-                    }
-                }
-            } else {
-                var offset = firstChunk.buffer.size.toLong()
-                var isLast = false
-                var iterations = 0
-                while (!isLast && iterations < 4096) {
-                    iterations++
-                    if (isCancelled()) return null
-                    val chunk = postsRepository.downloadFileChunk(
-                        path = video.path,
-                        file = video.file,
-                        offset = offset
-                    )
-                    if (chunk.statusCode != 200 && chunk.statusCode != -1) return null
-                    if (chunk.buffer.isEmpty() && !chunk.isLastChunk) return null
-                    out.write(chunk.buffer)
-                    offset += chunk.buffer.size
-                    downloadedBytes += chunk.buffer.size
-                    totalBytes = maxOf(totalBytes, chunk.totalSize)
-                    onProgress(downloadedBytes, totalBytes)
-                    isLast = chunk.isLastChunk
-                }
-            }
-        }
-
-        if (isCancelled()) return null
-        val payload = out.toByteArray()
-        if (payload.isEmpty()) return null
+        val payload = downloadStorageFileBytes(
+            fileId = id,
+            variant = VARIANT_VIDEO,
+            knownTotal = video.fileSize ?: 0L,
+            onProgress = onProgress,
+            isCancelled = isCancelled
+        ) ?: return null
 
         imageDiskCache?.let { cache ->
             withContext(Dispatchers.IO) { cache.write(video.cacheKey, payload) }
@@ -292,7 +201,7 @@ class HomeGateway(
 
     suspend fun loadFile(
         file: PostFile,
-        onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _ -> },
+        onProgress: (Long, Long) -> Unit = { _, _ -> },
         isCancelled: () -> Boolean = { false }
     ): File? {
         if (file.isEmpty) return null
@@ -302,18 +211,16 @@ class HomeGateway(
             return cached
         }
 
-        val payload = run {
-            val id = file.fileId
-            if (id != null && id > 0) {
-                downloadStorageFileBytes(id, file.size, onProgress, isCancelled)
-            } else if (file.path.isNotBlank() && file.file.isNotBlank()) {
-                downloadFileByPath(file, onProgress, isCancelled)
-            } else {
-                null
-            }
-        } ?: return null
+        val id = file.fileId ?: return null
+        if (id <= 0) return null
 
-        if (payload.isEmpty()) return null
+        val payload = downloadStorageFileBytes(
+            fileId = id,
+            variant = VARIANT_FILE,
+            knownTotal = file.size,
+            onProgress = onProgress,
+            isCancelled = isCancelled
+        ) ?: return null
 
         imageDiskCache?.let { cache ->
             withContext(Dispatchers.IO) { cache.write(file.cacheKey, payload) }
@@ -321,44 +228,11 @@ class HomeGateway(
         return resolveCachedFile(file.cacheKey)
     }
 
-    private suspend fun downloadFileByPath(
-        file: PostFile,
-        onProgress: (Long, Long) -> Unit,
-        isCancelled: () -> Boolean
-    ): ByteArray? {
-        val out = ByteArrayOutputStream()
-        var downloaded = 0L
-        var total = file.size
-        var offset = 0L
-        var isLast = false
-        var iterations = 0
-
-        while (!isLast && iterations < 4096) {
-            iterations++
-            if (isCancelled()) return null
-
-            val chunk = postsRepository.downloadFileChunk(
-                path = file.path,
-                file = file.file,
-                offset = offset
-            )
-            if (chunk.statusCode != 200 && chunk.statusCode != -1) return null
-            if (chunk.buffer.isEmpty() && !chunk.isLastChunk) return null
-
-            out.write(chunk.buffer)
-            downloaded += chunk.buffer.size
-            offset += chunk.buffer.size
-            total = maxOf(total, chunk.totalSize)
-            onProgress(downloaded, total)
-            isLast = chunk.isLastChunk
-        }
-        return out.toByteArray().takeIf { it.isNotEmpty() }
-    }
-
     // === Storage (Neo: file_id Int) ===
 
     private suspend fun downloadStorageFileBytes(
         fileId: Int,
+        variant: String,
         knownTotal: Long,
         onProgress: (Long, Long) -> Unit,
         isCancelled: () -> Boolean
@@ -374,14 +248,17 @@ class HomeGateway(
             iterations++
             if (isCancelled()) return null
 
-            val response = postsRepository.downloadStorageChunk(fileId, offset, "original")
-            val chunk = extractGatewayBuffer(response)
-            if (chunk == null) return null
+            val response = runCatching {
+                postsRepository.downloadStorageChunk(fileId, offset, variant)
+            }.getOrNull() ?: return null
+
+            val chunk = extractGatewayBuffer(response) ?: return null
             if (chunk.isEmpty()) break
 
             out.write(chunk)
             downloaded += chunk.size
             offset += chunk.size
+
             val rawTotal = response["total_size"]
             val responseTotal: Long = when (rawTotal) {
                 is Number -> rawTotal.toLong()
@@ -414,19 +291,6 @@ class HomeGateway(
             return bytes
         }
 
-        val nested = (response["file"] as? Map<*, *>)?.get("buffer")
-            ?: (response["data"] as? Map<*, *>)?.get("buffer")
-        if (nested is ByteArray) return nested
-        if (nested is List<*>) {
-            val bytes = ByteArray(nested.size)
-            for (i in nested.indices) {
-                val v = nested[i]
-                if (v !is Number) return null
-                bytes[i] = v.toByte()
-            }
-            return bytes
-        }
-
         return null
     }
 
@@ -434,9 +298,7 @@ class HomeGateway(
 
     suspend fun loadStorageStats(): ImageDiskCache.StorageStats? {
         val cache = imageDiskCache ?: return null
-        return withContext(Dispatchers.IO) {
-            cache.collectStorageStats()
-        }
+        return withContext(Dispatchers.IO) { cache.collectStorageStats() }
     }
 
     suspend fun clearStorageCategories(
@@ -456,8 +318,6 @@ class HomeGateway(
         }
 
         val cache = imageDiskCache ?: return ImageDiskCache.StorageClearResult()
-        return withContext(Dispatchers.IO) {
-            cache.clearByCategories(categories)
-        }
+        return withContext(Dispatchers.IO) { cache.clearByCategories(categories) }
     }
 }
