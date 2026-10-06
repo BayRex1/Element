@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import elemsocial.com.ui.pack.theme.ElementUiPalette
@@ -28,17 +29,19 @@ fun MessengerWebScreen(
     modifier: Modifier = Modifier
 ) {
     val key = sessionKey?.trim().orEmpty()
-    var keyHolder = key
-    val webView = remember {
-        WebView(androidx.compose.ui.platform.LocalContext.current).apply {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val currentKey by rememberUpdatedState(key)
+    val currentPath by rememberUpdatedState(initialPath)
+    val webView = remember(context) {
+        WebView(context).apply {
             setBackgroundColor(AndroidColor.TRANSPARENT)
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
-                    val currentKey = keyHolder
-                    if (currentKey.isBlank()) return
-                    val escaped = currentKey.replace("\\", "\\\\").replace("'", "\\'")
+                    val current = currentKey
+                    if (current.isBlank()) return
+                    val escaped = current.replace("\\", "\\\\").replace("'", "\\'")
                     view.evaluateJavascript("localStorage.setItem('S_KEY','$escaped'); true;") {
-                        if (!url.contains(initialPath)) view.loadUrl("https://elemsocial.com$initialPath")
+                        if (!url.contains(currentPath)) view.loadUrl("https://elemsocial.com$currentPath")
                     }
                 }
             }
@@ -65,7 +68,6 @@ fun MessengerWebScreen(
             factory = { webView },
             modifier = Modifier.fillMaxSize(),
             update = { view ->
-                keyHolder = key
                 if (view.url.isNullOrBlank()) view.loadUrl("https://elemsocial.com/")
             }
         )
