@@ -244,7 +244,7 @@ class SocialRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "gifts/load",
+                "action" to "gifts/get",
                 "payload" to mapOf(
                     "username" to username
                 )
@@ -256,7 +256,7 @@ class SocialRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "gifts/load"
+                "action" to "gifts/get"
             )
         )
     }
