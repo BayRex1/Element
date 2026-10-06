@@ -81,6 +81,12 @@ private fun parseInputDate(raw: String?, zoneId: ZoneId): ZonedDateTime? {
     val value = raw?.trim().orEmpty()
     if (value.isEmpty()) return null
 
+    // API may return last_online as Unix seconds/milliseconds.
+    value.toLongOrNull()?.let { raw ->
+        val millis = if (kotlin.math.abs(raw) < 100_000_000_000L) raw * 1000L else raw
+        runCatching { return Instant.ofEpochMilli(millis).atZone(zoneId) }
+    }
+
     runCatching {
         return Instant.parse(value).atZone(zoneId)
     }
