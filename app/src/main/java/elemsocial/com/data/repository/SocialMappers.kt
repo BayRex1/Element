@@ -1,6 +1,5 @@
 package elemsocial.com.data.repository
 
-import android.util.Log
 import elemsocial.com.domain.model.FeedPost
 import elemsocial.com.domain.model.PostAuthor
 import elemsocial.com.domain.model.PostComment
@@ -25,22 +24,97 @@ internal fun parseFeedPosts(raw: Any?): List<FeedPost> {
 
 internal fun parseFeedPost(raw: Any?): FeedPost? {
     val map = raw.asMap() ?: return null
-
-    // ⬇️ ВРЕМЕННЫЙ ЛОГ — удалить после отладки ⬇️
-    Log.d("POST_RAW", "=== RAW POST ===")
-    Log.d("POST_RAW", map.toString())
-    Log.d("POST_RAW", "--- author ---")
-    Log.d("POST_RAW", map["author"]?.toString() ?: "null")
-    Log.d("POST_RAW", "--- avatar inside author ---")
-    val authorMap = map["author"].asRichMap()
-    Log.d("POST_RAW", authorMap?.get("avatar")?.toString() ?: "null")
-    Log.d("POST_RAW", "--- content ---")
-    Log.d("POST_RAW", map["content"]?.toString() ?: "null")
-    Log.d("POST_RAW", "=== END RAW POST ===")
-    // ⬆️ ВРЕМЕННЫЙ ЛОГ ⬆️
-
     val id = map["id"].asInt() ?: return null
-    val contentMap = map["content"].asRichMap() ?: emptyMap()
+
+    // content — МАССИВ блоков:
+    // [ {type:"images", items:[...]}, {type:"videos", items:[...]}, {type:"tracks", items:[...]} ]
+    val contentBlocks = (map["content"] as? List<*>).orEmpty()
+
+    val images = mutableListOf<PostImage>()
+    val videos = mutableListOf<PostVideo>()
+    val files = mutableListOf<PostFile>()
+    val songs = mutableListOf<PostSong>()
+
+    contentBlocks.forEach { blockRaw ->
+        val block = blockRaw.asRichMap() ?: return@forEach
+        val type = block["type"]?.toString()?.lowercase() ?: return@forEach
+        val items = (block["items"] as? List<*>).orEmpty()
+
+        when (type) {
+            "images" -> items.forEach { itemRaw ->
+                val item = itemRaw.asRichMap() ?: return@forEach
+                // ассет лежит под ключом "image"
+                val asset = parseAsset(item["image"])
+                val fileName = item["file_name"]?.toString()
+                val fileSize = item["file_size"].asLong()
+                if (asset != null || fileName != null) {
+                    images.add(
+                        PostImage(
+                            asset = asset,
+                            fileName = fileName,
+                            fileSize = fileSize
+                        )
+                    )
+                }
+            }
+            "videos" -> items.forEach { itemRaw ->
+                val item = itemRaw.asRichMap() ?: return@forEach
+                // ассет лежит под ключом "video"
+                val videoMap = item["video"].asRichMap()
+                val videoId = videoMap?.get("file_id").asInt()
+                val preview = parseAsset(videoMap?.get("preview"))
+                val fileName = item["file_name"]?.toString()
+                val fileSize = item["file_size"].asLong()
+                if (videoId != null && videoId > 0) {
+                    videos.add(
+                        PostVideo(
+                            file = "",
+                            fileId = videoId,
+                            fileName = fileName,
+                            fileSize = fileSize,
+                            preview = preview,
+                            info = null
+                        )
+                    )
+                }
+            }
+            "files" -> items.forEach { itemRaw ->
+                val item = itemRaw.asRichMap() ?: return@forEach
+                // ассет лежит под ключом "file"
+                val fileMap = item["file"].asRichMap() ?: item
+                val fileId = fileMap["id"].asInt()
+                    ?: fileMap["file_id"].asInt()
+                val fileName = item["file_name"]?.toString()
+                    ?: fileMap["name"]?.toString()
+                val fileSize = item["file_size"].asLong()
+                    ?: fileMap["size"].asLong()
+                if (fileId != null && fileId > 0) {
+                    files.add(
+                        PostFile(
+                            id = fileId,
+                            fileId = fileId,
+                            name = fileName ?: "file",
+                            size = fileSize ?: 0L,
+                            mimeType = fileMap["mime"]?.toString(),
+                            path = "",
+                            file = ""
+                        )
+                    )
+                }
+            }
+            "tracks" -> items.forEach { itemRaw ->
+                val item = itemRaw.asRichMap() ?: return@forEach
+                val songId = item["id"].asInt() ?: return@forEach
+                songs.add(
+                    PostSong(
+                        id = songId,
+                        title = "",
+                        artist = ""
+                    )
+                )
+            }
+        }
+    }
 
     return FeedPost(
         id = id,
@@ -48,12 +122,12 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
         text = map["text"]?.toString(),
         poll = parsePoll(map["poll"]),
         content = PostContent(
-            images = parseImages(contentMap),
-            videos = parseVideos(contentMap),
-            files = parseFiles(contentMap),
-            filesCount = (contentMap["files"] as? List<*>)?.size ?: 0,
-            videosCount = (contentMap["videos"] as? List<*>)?.size ?: 0,
-            songs = parseSongs(contentMap)
+            images = images,
+            videos = videos,
+            files = files,
+            filesCount = files.size,
+            videosCount = videos.size,
+            songs = songs
         ),
         createDate = map["create_date"]?.toString(),
         editedAt = map["edited_at"]?.toString(),
@@ -71,7 +145,7 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
 
 internal fun parseReactions(raw: Any?): PostReactions? {
     val map = raw.asRichMap() ?: return null
-    val resultsMap = map["results"].asRichMap() ?: map.asRichMap() ?: return null
+    val resultsMap = map["results"].asRichMap() ?: return null
 
     val results = resultsMap.mapNotNull { (key, value) ->
         val count = value.asInt() ?: return@mapNotNull null
@@ -87,6 +161,8 @@ internal fun parseReactions(raw: Any?): PostReactions? {
                 else -> item.asRichMap()?.get("reaction")?.toString()?.takeIf { it.isNotBlank() }
             }
         }
+
+    if (results.isEmpty() && userReactions.isEmpty()) return null
 
     return PostReactions(
         results = results,
@@ -137,8 +213,6 @@ internal fun parseComments(raw: Any?): List<PostComment> {
         val map = item.asMap() ?: return@mapNotNull null
         val id = map["id"].asInt() ?: return@mapNotNull null
         val postId = map["post_id"].asInt(0) ?: 0
-        val contentMap = map["content"].asRichMap() ?: emptyMap()
-        val replyMap = contentMap["reply"].asRichMap()
 
         PostComment(
             id = id,
@@ -146,15 +220,9 @@ internal fun parseComments(raw: Any?): List<PostComment> {
             author = parseAuthor(map["author"]),
             text = map["text"]?.toString().orEmpty(),
             content = PostCommentContent(
-                reply = replyMap?.let {
-                    PostCommentReply(
-                        commentId = it["comment_id"].asInt(),
-                        author = parseAuthor(it["author"]),
-                        text = it["text"]?.toString().orEmpty()
-                    )
-                },
-                images = parseImages(contentMap),
-                filesCount = (contentMap["files"] as? List<*>)?.size ?: 0
+                reply = null,
+                images = emptyList(),
+                filesCount = 0
             ),
             date = map["date"]?.toString(),
             deleted = map["deleted"].asBoolean()
@@ -166,9 +234,8 @@ internal fun parseAuthor(raw: Any?): PostAuthor? {
     val map = raw.asMap() ?: return null
     val icons = when (val source = map["icons"]) {
         is List<*> -> source.mapNotNull { item ->
-            item.asMap()?.get("icon_id")?.toString() ?: item?.toString()
+            item.asRichMap()?.get("icon_id")?.toString() ?: item?.toString()
         }
-
         is String -> listOf(source)
         else -> emptyList()
     }
@@ -185,174 +252,51 @@ internal fun parseAuthor(raw: Any?): PostAuthor? {
     )
 }
 
+/**
+ * Парсит ассет (avatar, image, video, cover).
+ * Ожидает объект вида:
+ *   { file_id: 123, width: 1080, height: 1080, dominant_color: "...", blur_hash: "..." }
+ * либо legacy:
+ *   { img_data: { path, file, simple, aura, preview } }
+ */
 internal fun parseAsset(raw: Any?): PostImageAsset? {
-    val baseMap = raw.asRichMap() ?: return null
+    if (raw == null) return null
 
-    // Логируем каждый ассет, чтобы видеть формат
-    Log.d("ASSET_RAW", "asset = $baseMap")
+    // Если пришла строка (старый API) — считаем её file name
+    if (raw is String) {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty() || trimmed == "None") return null
+        return PostImageAsset(
+            fileId = null,
+            path = "/Content/Avatars",
+            file = trimmed
+        )
+    }
+
+    val baseMap = raw.asRichMap() ?: return null
 
     val fileId = baseMap["file_id"].asInt()
         ?: baseMap["fileId"].asInt()
         ?: baseMap["id"].asInt()
 
-    val map = baseMap["img_data"].asRichMap()
+    val inner = baseMap["img_data"].asRichMap()
         ?: baseMap["image"].asRichMap()
-        ?: baseMap["asset"].asRichMap()
         ?: baseMap
 
-    val path = map["path"]?.toString()?.takeIf { it.isNotBlank() }
-        ?: baseMap["path"]?.toString()?.takeIf { it.isNotBlank() }
-        ?: ""
-    val file = map["file"]?.toString()?.takeIf { it.isNotBlank() }
-        ?: baseMap["file"]?.toString()?.takeIf { it.isNotBlank() }
-        ?: ""
+    val path = inner["path"]?.toString()?.takeIf { it.isNotBlank() } ?: ""
+    val file = inner["file"]?.toString()?.takeIf { it.isNotBlank() } ?: ""
 
-    if (fileId == null && path.isBlank() && file.isBlank()) return null
+    if ((fileId == null || fileId <= 0) && (path.isBlank() || file.isBlank())) {
+        return null
+    }
 
     return PostImageAsset(
         fileId = fileId,
         path = path,
         file = file,
-        simple = map["simple"]?.toString() ?: baseMap["simple"]?.toString(),
-        aura = map["aura"]?.toString() ?: baseMap["aura"]?.toString(),
-        preview = map["preview"]?.toString() ?: baseMap["preview"]?.toString()
-    )
-}
-
-private fun parseImages(contentMap: Map<String, Any?>): List<PostImage> {
-    val images = (contentMap["images"] as? List<*>)
-        .orEmpty()
-        .mapNotNull { parseImage(it) }
-        .toMutableList()
-
-    val legacy = contentMap["Image"]?.let { parseImage(it) }
-    if (legacy != null) {
-        images.add(legacy)
-    }
-
-    return images
-}
-
-private fun parseImage(raw: Any?): PostImage? {
-    val map = raw.asRichMap() ?: return null
-    val fileName = map["orig_name"]?.toString() ?: map["file_name"]?.toString()
-    val fileSize = map["file_size"].asLong()
-
-    val asset = parseAsset(map)
-    val resolvedAsset = asset ?: fileName
-        ?.takeIf { it.isNotBlank() }
-        ?.let { legacyName ->
-            PostImageAsset(
-                path = "posts/images",
-                file = legacyName
-            )
-        }
-
-    if (resolvedAsset == null && fileName.isNullOrBlank()) {
-        return null
-    }
-
-    return PostImage(
-        asset = resolvedAsset,
-        fileName = fileName,
-        fileSize = fileSize
-    )
-}
-
-private fun parseVideos(contentMap: Map<String, Any?>): List<PostVideo> {
-    return (contentMap["videos"] as? List<*>)
-        .orEmpty()
-        .mapNotNull { parseVideo(it) }
-}
-
-private fun parseFiles(contentMap: Map<String, Any?>): List<PostFile> {
-    return (contentMap["files"] as? List<*>)
-        .orEmpty()
-        .mapNotNull { parseFile(it) }
-}
-
-private fun parseFile(raw: Any?): PostFile? {
-    val map = raw.asRichMap() ?: return null
-
-    val id = map["id"].asInt() ?: 0
-    val fileId = map["file_id"].asInt()
-        ?: map["fileId"].asInt()
-        ?: map["storage_id"].asInt()
-        ?: map["storageId"].asInt()
-
-    val file = map["file"]?.toString()?.takeIf { it.isNotBlank() }
-        ?: map["name"]?.toString()?.takeIf { it.isNotBlank() }
-        ?: ""
-    val name = map["name"]?.toString()
-        ?: map["file_name"]?.toString()
-        ?: map["orig_name"]?.toString()
-        ?: file
-    val size = map["size"].asLong()
-        ?: map["file_size"].asLong()
-        ?: 0L
-    val mimeType = map["type"]?.toString()
-        ?: map["mime_type"]?.toString()
-    val path = map["path"]?.toString()?.takeIf { it.isNotBlank() }
-        ?: "posts/files"
-
-    if (fileId == null && file.isBlank() && name.isBlank()) return null
-
-    return PostFile(
-        id = id,
-        fileId = fileId,
-        name = name,
-        size = size,
-        mimeType = mimeType,
-        path = path,
-        file = file
-    )
-}
-
-private fun parseSongs(contentMap: Map<String, Any?>): List<PostSong> {
-    return (contentMap["songs"] as? List<*>)
-        .orEmpty()
-        .mapNotNull { parseSong(it) }
-}
-
-private fun parseSong(raw: Any?): PostSong? {
-    val map = raw.asRichMap() ?: return null
-    val id = map["id"].asInt() ?: return null
-    val title = map["title"]?.toString()?.takeIf { it.isNotBlank() } ?: return null
-    val artist = map["artist"]?.toString()?.takeIf { it.isNotBlank() } ?: return null
-
-    return PostSong(
-        id = id,
-        title = title,
-        artist = artist,
-        album = map["album"]?.toString(),
-        cover = parseAsset(map["cover"]),
-        durationSeconds = map["duration"].asDouble()
-    )
-}
-
-private fun parseVideo(raw: Any?): PostVideo? {
-    val map = raw.asRichMap() ?: return null
-    val fileId = map["file_id"].asInt()
-        ?: map["fileId"].asInt()
-        ?: map["id"].asInt()
-    val file = map["file"]?.toString()?.takeIf { it.isNotBlank() } ?: ""
-    if (fileId == null && file.isBlank()) return null
-
-    val preview = parseAsset(map["preview"])
-    val info = map["info"].asRichMap()?.let {
-        PostVideoInfo(
-            width = it["width"].asInt(),
-            height = it["height"].asInt()
-        )
-    }
-
-    return PostVideo(
-        file = file,
-        fileId = fileId,
-        fileName = map["name"]?.toString() ?: map["file_name"]?.toString(),
-        fileSize = map["size"].asLong() ?: map["file_size"].asLong(),
-        preview = preview,
-        info = info
+        simple = inner["simple"]?.toString() ?: baseMap["simple"]?.toString(),
+        aura = inner["aura"]?.toString() ?: baseMap["aura"]?.toString(),
+        preview = inner["preview"]?.toString() ?: baseMap["preview"]?.toString()
     )
 }
 
