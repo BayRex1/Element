@@ -9,7 +9,8 @@ class MusicRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "music/load_library"
+                "action" to "music/get_tracks",
+                "payload" to mapOf("type" to "my")
             )
         )
     }
@@ -18,9 +19,11 @@ class MusicRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "load_songs",
-                "songs_type" to type,
-                "start_index" to startIndex
+                "action" to "music/get_tracks",
+                "payload" to mapOf(
+                    "type" to type,
+                    "start_index" to startIndex
+                )
             )
         )
     }
@@ -29,8 +32,8 @@ class MusicRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "load_song",
-                "song_id" to trackId
+                "action" to "music/get_track",
+                "payload" to mapOf("song_id" to trackId)
             )
         )
     }
@@ -39,10 +42,8 @@ class MusicRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "music/playlists/load",
-                "payload" to mapOf(
-                    "playlist_id" to playlistId
-                )
+                "action" to "music/get_song",
+                "payload" to mapOf("song_id" to playlistId)
             )
         )
     }
@@ -51,9 +52,8 @@ class MusicRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "music/like",
-                "song_id" to trackId,
-                "target" to 0
+                "action" to "music/fav/add",
+                "payload" to mapOf("song_id" to trackId)
             )
         )
     }
@@ -94,7 +94,7 @@ class MusicRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "music/playlists/add",
+                "action" to "music/playlists/add_song",
                 "payload" to mapOf(
                     "playlist_id" to playlistId,
                     "song_id" to trackId
@@ -110,7 +110,7 @@ class MusicRemoteDataSource(
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "music/playlists/remove",
+                "action" to "music/playlists/remove_song",
                 "payload" to mapOf(
                     "playlist_id" to playlistId,
                     "song_id" to trackId
