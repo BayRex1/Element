@@ -369,6 +369,8 @@ fun AuthScreen(
     var loginLoading by remember { mutableStateOf(false) }
     var loginEmail by remember { mutableStateOf("") }
     var loginPassword by remember { mutableStateOf("") }
+    var showSessionKeyLogin by remember { mutableStateOf(false) }
+    var sessionKeyInput by remember { mutableStateOf("") }
 
     var regLoading by remember { mutableStateOf(false) }
     var regName by remember { mutableStateOf("") }
@@ -691,6 +693,39 @@ fun AuthScreen(
                                         )
 
                                         SecondaryButton(
+                                            title = if (showSessionKeyLogin) "Скрыть вход по S_KEY" else "Войти по секретному ключу (S_KEY)",
+                                            onClick = { showSessionKeyLogin = !showSessionKeyLogin }
+                                        )
+
+                                        if (showSessionKeyLogin) {
+                                            AuthInput(
+                                                value = sessionKeyInput,
+                                                onValueChange = { sessionKeyInput = it },
+                                                placeholder = "Секретный ключ (S_KEY)"
+                                            )
+                                            PrimaryButton(
+                                                title = "Подключить ключ",
+                                                loading = loginLoading,
+                                                onClick = {
+                                                    scope.launch {
+                                                        val key = sessionKeyInput.trim()
+                                                        if (key.isBlank()) {
+                                                            setError("Введите S_KEY")
+                                                            return@launch
+                                                        }
+                                                        if (loginLoading) return@launch
+                                                        loginLoading = true
+                                                        try {
+                                                            if (ensureSocketReady()) finalizeSession(key)
+                                                        } finally {
+                                                            loginLoading = false
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
+
+                                        SecondaryButton(
                                             title = "Создать аккаунт",
                                             onClick = { page = AuthPage.REGISTER }
                                         )
@@ -1005,6 +1040,39 @@ fun AuthScreen(
                                                 }
                                             }
                                         )
+
+                                        SecondaryButton(
+                                            title = if (showSessionKeyLogin) "Скрыть вход по S_KEY" else "Войти по секретному ключу (S_KEY)",
+                                            onClick = { showSessionKeyLogin = !showSessionKeyLogin }
+                                        )
+
+                                        if (showSessionKeyLogin) {
+                                            AuthInput(
+                                                value = sessionKeyInput,
+                                                onValueChange = { sessionKeyInput = it },
+                                                placeholder = "Секретный ключ (S_KEY)"
+                                            )
+                                            PrimaryButton(
+                                                title = "Подключить ключ",
+                                                loading = loginLoading,
+                                                onClick = {
+                                                    scope.launch {
+                                                        val key = sessionKeyInput.trim()
+                                                        if (key.isBlank()) {
+                                                            setError("Введите S_KEY")
+                                                            return@launch
+                                                        }
+                                                        if (loginLoading) return@launch
+                                                        loginLoading = true
+                                                        try {
+                                                            if (ensureSocketReady()) finalizeSession(key)
+                                                        } finally {
+                                                            loginLoading = false
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
 
                                         SecondaryButton(
                                             title = "Создать аккаунт",
