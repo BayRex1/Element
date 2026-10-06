@@ -3,6 +3,7 @@ package elemsocial.com.core.ws
 import elemsocial.com.core.codec.MsgPackCodec
 import elemsocial.com.core.crypto.CryptoEngine
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.TimeoutCancellationException
@@ -165,6 +167,47 @@ class ElementSocketClient(
         return result == true
     }
 
+    /** Neo storage sends file chunks as storage/download events, not ray responses. */
+    suspend fun requestStorageDownloadChunk(
+        fileId: Int,
+        offset: Long,
+        variant: String = "original",
+        timeoutMs: Long = 30_000
+    ): Map<String, Any?> {
+        if (!isSocketReadyToSend()) throw IllegalStateException("Socket is not ready")
+
+        return kotlinx.coroutines.withTimeout(timeoutMs) {
+            kotlinx.coroutines.coroutineScope {
+                val event = async {
+                    events.first { payload ->
+                        val eventType = payload["type"]?.toString()?.lowercase()
+                        val eventAction = payload["action"]?.toString()?.lowercase()
+                        val nested = payload["payload"] as? Map<*, *>
+                        val eventFileId = (payload["file_id"] ?: nested?.get("file_id")).asIntValue()
+                        val eventOffset = (payload["offset"] ?: nested?.get("offset")).asLongValue()
+                        eventType == "storage" &&
+                            eventAction == "download" &&
+                            eventFileId == fileId &&
+                            eventOffset == offset
+                    }
+                }
+
+                sendFireAndForget(
+                    mapOf(
+                        "type" to "storage",
+                        "action" to "download",
+                        "payload" to mapOf(
+                            "file_id" to fileId,
+                            "variant" to variant,
+                            "offset" to offset
+                        )
+                    )
+                )
+                event.await()
+            }
+        }
+    }
+
     suspend fun sendRequest(payload: Map<String, Any?>, timeoutMs: Long = 60_000): Map<String, Any?> {
         if (isSocketReadyToSend()) return sendNowAwait(payload, timeoutMs)
 
@@ -272,6 +315,17 @@ class ElementSocketClient(
                 handleTransportLoss(ConnectionState.Error, t)
             }
         })
+    }
+
+    private fun sendFireAndForget(payload: Map<String, Any?>) {
+        val socket = webSocket ?: throw IllegalStateException("WebSocket is not connected")
+        val outboundAes = serverAesKey ?: throw IllegalStateException("Transport keys are not ready")
+        if (_connectionState.value != ConnectionState.Ready) throw IllegalStateException("Socket is not ready")
+
+        val packet = payload.toMutableMap().apply { put("ray_id", generateRayId(16)) }
+        val encoded = MsgPackCodec.encodeMap(packet)
+        val encrypted = CryptoEngine.aesEncryptWithIvPrefix(encoded, outboundAes)
+        if (!socket.send(encrypted.toByteString())) throw IOException("WebSocket send returned false")
     }
 
     private suspend fun sendNowAwait(payload: Map<String, Any?>, timeoutMs: Long): Map<String, Any?> {
@@ -535,6 +589,18 @@ class ElementSocketClient(
     private fun nextUrl() {
         if (urls.isEmpty()) return
         urlIndex = (urlIndex + 1) % urls.size
+    }
+
+    private fun Any?.asIntValue(): Int? = when (this) {
+        is Number -> toInt()
+        is String -> toIntOrNull()
+        else -> null
+    }
+
+    private fun Any?.asLongValue(): Long? = when (this) {
+        is Number -> toLong()
+        is String -> toLongOrNull()
+        else -> null
     }
 
     private fun generateRayId(length: Int): String {
