@@ -1,20 +1,13 @@
 package elemsocial.com.domain.model
 
-enum class PostsCategory(
-    val apiValue: String,
-    val title: String
-) {
+enum class PostsCategory(val apiValue: String, val title: String) {
     Last("last", "Последние"),
     Recommended("rec", "Рекомендации"),
     Subscriptions("subscribe", "Подписки")
 }
 
-data class ActionResult(
-    val status: String,
-    val message: String? = null
-) {
-    val isSuccess: Boolean
-        get() = status != "error"
+data class ActionResult(val status: String, val message: String? = null) {
+    val isSuccess: Boolean get() = status != "error"
 }
 
 data class FeedResult(
@@ -79,11 +72,7 @@ data class PostPoll(
     val options: List<PostPollOption> = emptyList()
 )
 
-data class PostPollOption(
-    val id: Int,
-    val text: String,
-    val votesCount: Int = 0
-)
+data class PostPollOption(val id: Int, val text: String, val votesCount: Int = 0)
 
 data class PollVoteResult(
     val status: String,
@@ -112,8 +101,7 @@ data class PostContent(
     val videosCount: Int = 0,
     val songs: List<PostSong> = emptyList()
 ) {
-    val songsCount: Int
-        get() = songs.size
+    val songsCount: Int get() = songs.size
 }
 
 data class PostFile(
@@ -171,10 +159,7 @@ data class PostVideo(
         get() = (fileId == null || fileId <= 0) && (path.isBlank() || file.isBlank())
 }
 
-data class PostVideoInfo(
-    val width: Int? = null,
-    val height: Int? = null
-)
+data class PostVideoInfo(val width: Int? = null, val height: Int? = null)
 
 data class PostImageAsset(
     val fileId: Int? = null,
@@ -202,11 +187,7 @@ data class OnlineUser(
     val avatar: PostImageAsset? = null
 )
 
-data class UploadFilePayload(
-    val name: String,
-    val mimeType: String,
-    val bytes: ByteArray
-) {
+data class UploadFilePayload(val name: String, val mimeType: String, val bytes: ByteArray) {
     val size: Int get() = bytes.size
 }
 
