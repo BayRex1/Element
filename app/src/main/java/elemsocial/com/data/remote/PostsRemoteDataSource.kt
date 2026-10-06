@@ -239,21 +239,31 @@ class PostsRemoteDataSource(
 
     // === Neo storage (file_id) ===
 
-    suspend fun downloadStorageChunk(
+    suspend fun getStorageFileData(
         fileId: Int,
-        offset: Long,
-        variant: String = "webp"
+        variant: String = "original"
     ): Map<String, Any?> =
         socketClient.sendRequest(
             mapOf(
                 "type" to "storage",
-                "action" to "download",
+                "action" to "get_file_data",
                 "payload" to mapOf(
                     "file_id" to fileId,
-                    "offset" to offset,
                     "variant" to variant
                 )
             ),
+            timeoutMs = 30_000
+        )
+
+    suspend fun downloadStorageChunk(
+        fileId: Int,
+        offset: Long,
+        variant: String = "original"
+    ): Map<String, Any?> =
+        socketClient.requestStorageDownloadChunk(
+            fileId = fileId,
+            offset = offset,
+            variant = variant,
             timeoutMs = 30_000
         )
 }
