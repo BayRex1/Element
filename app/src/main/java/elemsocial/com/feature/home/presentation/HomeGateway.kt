@@ -224,6 +224,16 @@ class HomeGateway(
             val chunk = extractGatewayBuffer(response) ?: return null
             if (chunk.isEmpty()) break
 
+            val responseOffset = response["offset"]?.let {
+                when (it) {
+                    is Number -> it.toLong()
+                    is String -> it.toLongOrNull()
+                    else -> null
+                }
+            } ?: offset
+
+            if (responseOffset != offset) return null
+
             out.write(chunk)
             downloaded += chunk.size
             offset += chunk.size
@@ -239,6 +249,7 @@ class HomeGateway(
 
             val rawLast = response["is_last_chunk"]
             if (rawLast is Boolean && rawLast) isLast = true
+            if (total > 0L && downloaded >= total) isLast = true
             if (chunk.size < 1024 && total <= 0L) isLast = true
         }
 
