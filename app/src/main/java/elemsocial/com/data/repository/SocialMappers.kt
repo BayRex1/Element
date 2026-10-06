@@ -4,7 +4,6 @@ import elemsocial.com.domain.model.FeedPost
 import elemsocial.com.domain.model.PostAuthor
 import elemsocial.com.domain.model.PostComment
 import elemsocial.com.domain.model.PostCommentContent
-import elemsocial.com.domain.model.PostCommentReply
 import elemsocial.com.domain.model.PostContent
 import elemsocial.com.domain.model.PostFile
 import elemsocial.com.domain.model.PostImage
@@ -14,7 +13,6 @@ import elemsocial.com.domain.model.PostPollOption
 import elemsocial.com.domain.model.PostReactions
 import elemsocial.com.domain.model.PostSong
 import elemsocial.com.domain.model.PostVideo
-import elemsocial.com.domain.model.PostVideoInfo
 import org.json.JSONObject
 
 internal fun parseFeedPosts(raw: Any?): List<FeedPost> {
@@ -26,10 +24,7 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
     val map = raw.asMap() ?: return null
     val id = map["id"].asInt() ?: return null
 
-    // content — МАССИВ блоков:
-    // [ {type:"images", items:[...]}, {type:"videos", items:[...]}, {type:"tracks", items:[...]} ]
     val contentBlocks = (map["content"] as? List<*>).orEmpty()
-
     val images = mutableListOf<PostImage>()
     val videos = mutableListOf<PostVideo>()
     val files = mutableListOf<PostFile>()
@@ -43,23 +38,15 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
         when (type) {
             "images" -> items.forEach { itemRaw ->
                 val item = itemRaw.asRichMap() ?: return@forEach
-                // ассет лежит под ключом "image"
                 val asset = parseAsset(item["image"])
                 val fileName = item["file_name"]?.toString()
                 val fileSize = item["file_size"].asLong()
                 if (asset != null || fileName != null) {
-                    images.add(
-                        PostImage(
-                            asset = asset,
-                            fileName = fileName,
-                            fileSize = fileSize
-                        )
-                    )
+                    images.add(PostImage(asset = asset, fileName = fileName, fileSize = fileSize))
                 }
             }
             "videos" -> items.forEach { itemRaw ->
                 val item = itemRaw.asRichMap() ?: return@forEach
-                // ассет лежит под ключом "video"
                 val videoMap = item["video"].asRichMap()
                 val videoId = videoMap?.get("file_id").asInt()
                 val preview = parseAsset(videoMap?.get("preview"))
@@ -68,26 +55,20 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
                 if (videoId != null && videoId > 0) {
                     videos.add(
                         PostVideo(
-                            file = "",
                             fileId = videoId,
                             fileName = fileName,
                             fileSize = fileSize,
-                            preview = preview,
-                            info = null
+                            preview = preview
                         )
                     )
                 }
             }
             "files" -> items.forEach { itemRaw ->
                 val item = itemRaw.asRichMap() ?: return@forEach
-                // ассет лежит под ключом "file"
                 val fileMap = item["file"].asRichMap() ?: item
-                val fileId = fileMap["id"].asInt()
-                    ?: fileMap["file_id"].asInt()
-                val fileName = item["file_name"]?.toString()
-                    ?: fileMap["name"]?.toString()
-                val fileSize = item["file_size"].asLong()
-                    ?: fileMap["size"].asLong()
+                val fileId = fileMap["id"].asInt() ?: fileMap["file_id"].asInt()
+                val fileName = item["file_name"]?.toString() ?: fileMap["name"]?.toString()
+                val fileSize = item["file_size"].asLong() ?: fileMap["size"].asLong()
                 if (fileId != null && fileId > 0) {
                     files.add(
                         PostFile(
@@ -95,9 +76,7 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
                             fileId = fileId,
                             name = fileName ?: "file",
                             size = fileSize ?: 0L,
-                            mimeType = fileMap["mime"]?.toString(),
-                            path = "",
-                            file = ""
+                            mimeType = fileMap["mime"]?.toString()
                         )
                     )
                 }
@@ -105,13 +84,7 @@ internal fun parseFeedPost(raw: Any?): FeedPost? {
             "tracks" -> items.forEach { itemRaw ->
                 val item = itemRaw.asRichMap() ?: return@forEach
                 val songId = item["id"].asInt() ?: return@forEach
-                songs.add(
-                    PostSong(
-                        id = songId,
-                        title = "",
-                        artist = ""
-                    )
-                )
+                songs.add(PostSong(id = songId, title = "", artist = ""))
             }
         }
     }
@@ -163,19 +136,13 @@ internal fun parseReactions(raw: Any?): PostReactions? {
         }
 
     if (results.isEmpty() && userReactions.isEmpty()) return null
-
-    return PostReactions(
-        results = results,
-        userReactions = userReactions
-    )
+    return PostReactions(results = results, userReactions = userReactions)
 }
 
 internal fun parsePoll(raw: Any?): PostPoll? {
     val map = raw.asRichMap() ?: return null
     val id = map["id"].asInt() ?: 0
-    val options = (map["options"] as? List<*>)
-        .orEmpty()
-        .mapNotNull { parsePollOption(it) }
+    val options = (map["options"] as? List<*>).orEmpty().mapNotNull { parsePollOption(it) }
 
     return PostPoll(
         id = id,
@@ -193,19 +160,11 @@ private fun parsePollOption(raw: Any?): PostPollOption? {
     val map = raw.asRichMap() ?: return null
     val id = map["id"].asInt() ?: return null
     val text = map["text"]?.toString()?.takeIf { it.isNotBlank() } ?: return null
-
-    return PostPollOption(
-        id = id,
-        text = text,
-        votesCount = map["votes_count"].asInt(0) ?: 0
-    )
+    return PostPollOption(id = id, text = text, votesCount = map["votes_count"].asInt(0) ?: 0)
 }
 
-private fun parseIntList(raw: Any?): List<Int> {
-    return (raw as? List<*>)
-        .orEmpty()
-        .mapNotNull { it.asInt() }
-}
+private fun parseIntList(raw: Any?): List<Int> =
+    (raw as? List<*>).orEmpty().mapNotNull { it.asInt() }
 
 internal fun parseComments(raw: Any?): List<PostComment> {
     val list = raw as? List<*> ?: return emptyList()
@@ -213,17 +172,12 @@ internal fun parseComments(raw: Any?): List<PostComment> {
         val map = item.asMap() ?: return@mapNotNull null
         val id = map["id"].asInt() ?: return@mapNotNull null
         val postId = map["post_id"].asInt(0) ?: 0
-
         PostComment(
             id = id,
             postId = postId,
             author = parseAuthor(map["author"]),
             text = map["text"]?.toString().orEmpty(),
-            content = PostCommentContent(
-                reply = null,
-                images = emptyList(),
-                filesCount = 0
-            ),
+            content = PostCommentContent(),
             date = map["date"]?.toString(),
             deleted = map["deleted"].asBoolean()
         )
@@ -252,51 +206,26 @@ internal fun parseAuthor(raw: Any?): PostAuthor? {
     )
 }
 
-/**
- * Парсит ассет (avatar, image, video, cover).
- * Ожидает объект вида:
- *   { file_id: 123, width: 1080, height: 1080, dominant_color: "...", blur_hash: "..." }
- * либо legacy:
- *   { img_data: { path, file, simple, aura, preview } }
- */
 internal fun parseAsset(raw: Any?): PostImageAsset? {
     if (raw == null) return null
+    val map = raw.asRichMap() ?: return null
 
-    // Если пришла строка (старый API) — считаем её file name
-    if (raw is String) {
-        val trimmed = raw.trim()
-        if (trimmed.isEmpty() || trimmed == "None") return null
-        return PostImageAsset(
-            fileId = null,
-            path = "/Content/Avatars",
-            file = trimmed
-        )
-    }
+    val fileId = map["file_id"].asInt()
+        ?: map["fileId"].asInt()
+        ?: map["id"].asInt()
 
-    val baseMap = raw.asRichMap() ?: return null
+    val path = map["path"]?.toString()?.takeIf { it.isNotBlank() } ?: ""
+    val file = map["file"]?.toString()?.takeIf { it.isNotBlank() } ?: ""
 
-    val fileId = baseMap["file_id"].asInt()
-        ?: baseMap["fileId"].asInt()
-        ?: baseMap["id"].asInt()
-
-    val inner = baseMap["img_data"].asRichMap()
-        ?: baseMap["image"].asRichMap()
-        ?: baseMap
-
-    val path = inner["path"]?.toString()?.takeIf { it.isNotBlank() } ?: ""
-    val file = inner["file"]?.toString()?.takeIf { it.isNotBlank() } ?: ""
-
-    if ((fileId == null || fileId <= 0) && (path.isBlank() || file.isBlank())) {
-        return null
-    }
+    if ((fileId == null || fileId <= 0) && (path.isBlank() || file.isBlank())) return null
 
     return PostImageAsset(
         fileId = fileId,
         path = path,
         file = file,
-        simple = inner["simple"]?.toString() ?: baseMap["simple"]?.toString(),
-        aura = inner["aura"]?.toString() ?: baseMap["aura"]?.toString(),
-        preview = inner["preview"]?.toString() ?: baseMap["preview"]?.toString()
+        simple = map["simple"]?.toString(),
+        aura = map["aura"]?.toString(),
+        preview = map["preview"]?.toString()
     )
 }
 
@@ -314,39 +243,29 @@ internal fun Any?.asJsonObjectMap(): Map<String, Any?>? {
     }.getOrNull()
 }
 
-internal fun Any?.asRichMap(): Map<String, Any?>? {
-    return asMap() ?: asJsonObjectMap()
+internal fun Any?.asRichMap(): Map<String, Any?>? = asMap() ?: asJsonObjectMap()
+
+internal fun Any?.asInt(default: Int? = null): Int? = when (this) {
+    is Number -> toInt()
+    is String -> toIntOrNull() ?: default
+    else -> default
 }
 
-internal fun Any?.asInt(default: Int? = null): Int? {
-    return when (this) {
-        is Number -> toInt()
-        is String -> toIntOrNull() ?: default
-        else -> default
-    }
+internal fun Any?.asLong(default: Long? = null): Long? = when (this) {
+    is Number -> toLong()
+    is String -> toLongOrNull() ?: default
+    else -> default
 }
 
-internal fun Any?.asLong(default: Long? = null): Long? {
-    return when (this) {
-        is Number -> toLong()
-        is String -> toLongOrNull() ?: default
-        else -> default
-    }
+internal fun Any?.asDouble(default: Double? = null): Double? = when (this) {
+    is Number -> toDouble()
+    is String -> toDoubleOrNull() ?: default
+    else -> default
 }
 
-internal fun Any?.asDouble(default: Double? = null): Double? {
-    return when (this) {
-        is Number -> toDouble()
-        is String -> toDoubleOrNull() ?: default
-        else -> default
-    }
-}
-
-internal fun Any?.asBoolean(): Boolean {
-    return when (this) {
-        is Boolean -> this
-        is Number -> toInt() != 0
-        is String -> this.equals("true", ignoreCase = true) || this == "1"
-        else -> false
-    }
+internal fun Any?.asBoolean(): Boolean = when (this) {
+    is Boolean -> this
+    is Number -> toInt() != 0
+    is String -> this.equals("true", ignoreCase = true) || this == "1"
+    else -> false
 }
