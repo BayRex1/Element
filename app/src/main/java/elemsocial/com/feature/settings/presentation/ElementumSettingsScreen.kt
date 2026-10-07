@@ -308,10 +308,12 @@ private fun ElementumPluginsModal(
                                         val postId = plugin.icon.removePrefix("post/").trim().toIntOrNull()
                                         if (postId != null) {
                                             val loaded: ImageBitmap? = runCatching {
-                                                homeGateway.loadPost(postId).post?.content?.images?.firstOrNull()?.asset
-                                            }.getOrNull()?.let { asset ->
-                                                runCatching { homeGateway.loadImageBitmap(asset) }.getOrNull()
-                                            }
+                                                val asset = homeGateway.loadPost(postId).post?.content?.images?.firstOrNull()?.asset
+                                                    ?: return@runCatching null
+                                                val bytes = homeGateway.loadImageBytes(asset)
+                                                    ?: return@runCatching null
+                                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                                            }.getOrNull()
                                             if (loaded != null) iconBitmap = loaded
                                         }
                                     }
