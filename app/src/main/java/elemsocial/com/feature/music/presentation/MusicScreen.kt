@@ -3691,7 +3691,12 @@ private fun rememberMusicBitmap(
     homeGateway: HomeGateway
 ) = produceState<ImageBitmap?>(initialValue = null, key1 = asset?.cacheKey) {
     val source = asset ?: return@produceState
-    value = runCatching { homeGateway.loadImageBitmap(source) }.getOrNull()
+    val bytes = runCatching { homeGateway.loadImageBytes(source) }.getOrNull()
+        ?: return@produceState
+    if (bytes.isEmpty()) return@produceState
+    value = runCatching {
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }.getOrNull()
 }
 
 private fun postSongToTrack(song: PostSong): MusicTrack {
