@@ -22,7 +22,7 @@ class MusicRepositoryImpl(
     override suspend fun loadLibrary(): MusicResult<List<MusicPlaylistPreview>> {
         val response = remote.loadLibrary()
         return MusicResult(
-            status = response["status"]?.toString() ?: "error",
+            status = normalizeMusicStatus(response["status"]),
             message = response["message"]?.toString(),
             data = parseMusicLibrary(response["playlists"])
         )
@@ -31,7 +31,7 @@ class MusicRepositoryImpl(
     override suspend fun loadTracks(type: String, startIndex: Int): MusicResult<List<MusicTrack>> {
         val response = remote.loadTracks(type, startIndex)
         return MusicResult(
-            status = response["status"]?.toString() ?: "error",
+            status = normalizeMusicStatus(response["status"]),
             message = response["message"]?.toString(),
             data = parseMusicTracks(response["songs"])
         )
@@ -40,7 +40,7 @@ class MusicRepositoryImpl(
     override suspend fun loadTrack(trackId: Int): MusicResult<MusicTrack> {
         val response = remote.loadTrack(trackId)
         return MusicResult(
-            status = response["status"]?.toString() ?: "error",
+            status = normalizeMusicStatus(response["status"]),
             message = response["message"]?.toString(),
             data = parseMusicTrack(response["song"])
         )
@@ -78,7 +78,7 @@ class MusicRepositoryImpl(
         }
 
         return MusicResult(
-            status = response["status"]?.toString() ?: "error",
+            status = normalizeMusicStatus(response["status"]),
             message = response["message"]?.toString(),
             data = detail
         )
@@ -93,7 +93,7 @@ class MusicRepositoryImpl(
             parseMusicTrack(map)
         }
         return MusicResult(
-            status = response["status"]?.toString() ?: "error",
+            status = normalizeMusicStatus(response["status"]),
             message = response["message"]?.toString(),
             data = tracks
         )
@@ -112,7 +112,7 @@ class MusicRepositoryImpl(
     override suspend fun createPlaylist(name: String, description: String): MusicResult<Int> {
         val response = remote.createPlaylist(name, description)
         return MusicResult(
-            status = response["status"]?.toString() ?: "error",
+            status = normalizeMusicStatus(response["status"]),
             message = response["message"]?.toString(),
             data = response["playlist_id"].asInt()
         )
@@ -162,8 +162,27 @@ internal fun parseMusicTrack(raw: Any?): MusicTrack? {
     val map = raw.asRichMap() ?: return null
     val id = map["id"].asInt() ?: return null
     val title = map["title"]?.toString()?.takeIf { it.isNotBlank() } ?: return null
-    val artist = map["artist"]?.toString()?.takeIf { it.isNotBlank() } ?: return null
-    val originalFileId = map["original_file"].asInt(0) ?: 0
+
+    // The current API returns `artists` for real music records. Older payloads
+    // used a single `artist` string. Accept both so tracks are not silently
+    // dropped from the native screen.
+    val artist = map["artist"]?.toString()?.takeIf { it.isNotBlank() }
+        ?: run {
+            val artists = map["artists"] as? List<*>
+            artists
+                ?.mapNotNull { item ->
+                    item.asRichMap()?.get("name")?.toString()?.takeIf { it.isNotBlank() }
+                        ?: item?.toString()?.takeIf { it.isNotBlank() }
+                }
+                ?.joinToString(", ")
+                ?.takeIf { it.isNotBlank() }
+        }
+        ?: "Неизвестный исполнитель"
+
+    val originalFileId = map["original_file"].asInt()
+        ?: map["original_file_id"].asInt()
+        ?: map["file_id"].asInt()
+        ?: 0
 
     return MusicTrack(
         id = id,
@@ -202,6 +221,11 @@ private fun parseMusicLibrary(raw: Any?): List<MusicPlaylistPreview> {
             createDate = map["add_date"]?.toString()
         )
     }
+}
+
+private fun normalizeMusicStatus(raw: Any?): String = when (raw?.toString()?.lowercase()) {
+    "success", "ok", "200" -> "success"
+    else -> "error"
 }
 
 private fun actionResult(response: Map<String, Any?>): ActionResult {
