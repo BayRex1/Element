@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import elemsocial.com.R
 import elemsocial.com.core.plugins.ElementPlugin
 import elemsocial.com.core.plugins.ElementPluginStore
+import elemsocial.com.feature.home.presentation.HomeGateway
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -59,6 +61,7 @@ import elemsocial.com.ui.pack.theme.ElementUiPalette
 @Composable
 fun ElementumSettingsScreen(
     onBack: () -> Unit,
+    homeGateway: HomeGateway? = null,
     modifier: Modifier = Modifier
 ) {
     var pluginsOpen by remember { mutableStateOf(false) }
@@ -139,7 +142,7 @@ fun ElementumSettingsScreen(
     }
 
     if (pluginsOpen) {
-        ElementumPluginsModal(onClose = { pluginsOpen = false })
+        ElementumPluginsModal(onClose = { pluginsOpen = false }, homeGateway = homeGateway)
     }
 }
 
@@ -204,7 +207,8 @@ private fun ElementumMenuRow(
 
 @Composable
 private fun ElementumPluginsModal(
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    homeGateway: HomeGateway? = null
 ) {
     val context = LocalContext.current
     val store = remember { ElementPluginStore(context) }
@@ -288,12 +292,25 @@ private fun ElementumPluginsModal(
                                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(ElementUiPalette.BlockSoft),
                                 contentAlignment = Alignment.Center
                             ) {
-                                val iconBitmap = remember(plugin.id, plugin.iconBase64) {
-                                    plugin.iconBase64?.let { encoded ->
-                                        runCatching {
-                                            val bytes = Base64.decode(encoded, Base64.DEFAULT)
-                                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                                        }.getOrNull()
+                                var iconBitmap by remember(plugin.id, plugin.icon, plugin.iconBase64) {
+                                    mutableStateOf(
+                                        plugin.iconBase64?.let { encoded ->
+                                            runCatching {
+                                                val bytes = Base64.decode(encoded, Base64.DEFAULT)
+                                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                                            }.getOrNull()
+                                        }
+                                    )
+                                }
+                                LaunchedEffect(plugin.id, plugin.icon, homeGateway) {
+                                    if (iconBitmap == null && homeGateway != null && plugin.icon.startsWith("post/")) {
+                                        val postId = plugin.icon.removePrefix("post/").trim().toIntOrNull()
+                                        if (postId != null) {
+                                            val loaded = runCatching { homeGateway.loadPost(postId).post?.content?.images?.firstOrNull()?.asset }
+                                                .getOrNull()
+                                                ?.let { asset -> runCatching { homeGateway.loadImageBitmap(asset) }.getOrNull() }
+                                            if (loaded != null) iconBitmap = loaded
+                                        }
                                     }
                                 }
                                 if (iconBitmap != null) {
