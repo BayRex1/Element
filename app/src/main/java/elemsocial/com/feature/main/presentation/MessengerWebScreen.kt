@@ -1,10 +1,17 @@
 package elemsocial.com.feature.main.presentation
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.graphics.Color as AndroidColor
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebChromeClient
+import android.webkit.PermissionRequest
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
+import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +43,35 @@ fun MessengerWebScreen(
     val webView = remember(context) {
         WebView(context).apply {
             setBackgroundColor(AndroidColor.TRANSPARENT)
+            webChromeClient = object : WebChromeClient() {
+                override fun onPermissionRequest(request: PermissionRequest) {
+                    val activity = context as? Activity
+                    if (activity == null) {
+                        request.deny()
+                        return
+                    }
+                    val needsAudio = request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+                    val needsVideo = request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+                    val missing = buildList {
+                        if (needsAudio && ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                            add(Manifest.permission.RECORD_AUDIO)
+                        }
+                        if (needsVideo && ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                            add(Manifest.permission.CAMERA)
+                        }
+                    }
+                    if (missing.isNotEmpty()) {
+                        ActivityCompat.requestPermissions(activity, missing.toTypedArray(), 2407)
+                        request.deny()
+                        return
+                    }
+                    val allowed = request.resources.filter { resource ->
+                        resource == PermissionRequest.RESOURCE_AUDIO_CAPTURE ||
+                            resource == PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                    }.toTypedArray()
+                    if (allowed.isNotEmpty()) request.grant(allowed) else request.deny()
+                }
+            }
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
                     val current = currentKey
