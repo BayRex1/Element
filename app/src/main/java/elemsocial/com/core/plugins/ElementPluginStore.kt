@@ -39,13 +39,16 @@ class ElementPluginStore(private val context: Context) {
             description = root.optString("description", ""),
             version = root.optString("version", "1.0"),
             author = root.optString("author", "Unknown"),
-            icon = root.optString("icon", "🧩"),
+            icon = root.optString("icon", "🧩").takeIf { it != "[object]" } ?: "🧩",
+            iconBase64 = root.optJSONObject("icon_image")?.optString("data_base64")?.takeIf { it.isNotBlank() },
+            iconMimeType = root.optJSONObject("icon_image")?.optString("mime", "image/png"),
             fileName = file.name,
             settings = settings,
             visualBalance = visual?.optDouble("balance", Double.NaN)?.takeUnless { it.isNaN() },
             visualHallRank = visual?.optInt("hall_rank", 1),
             visualDisplayName = visual?.optString("display_name")?.takeIf { it.isNotBlank() },
-            visualUsername = visual?.optString("username")?.takeIf { it.isNotBlank() }
+            visualUsername = visual?.optString("username")?.takeIf { it.isNotBlank() },
+            useCurrentUser = visual?.optBoolean("use_current_user", true) ?: true
         )
     }.getOrNull()
 }
