@@ -1227,6 +1227,7 @@ fun MainShell(
             ) {
                 ElementumSettingsScreen(
                     onBack = { elementumSettingsOpen = false },
+                    homeGateway = homeGateway,
                     modifier = Modifier.fillMaxSize()
                 )
             }
