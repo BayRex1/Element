@@ -7,12 +7,15 @@ data class ElementPlugin(
     val version: String,
     val author: String,
     val icon: String,
+    val iconBase64: String? = null,
+    val iconMimeType: String? = null,
     val fileName: String,
     val settings: Map<String, String> = emptyMap(),
     val visualBalance: Double? = null,
     val visualHallRank: Int? = null,
     val visualDisplayName: String? = null,
-    val visualUsername: String? = null
+    val visualUsername: String? = null,
+    val useCurrentUser: Boolean = true
 )
 
 object ElementPluginRuntime {
@@ -23,14 +26,18 @@ object ElementPluginRuntime {
         return activePlugin(context)?.visualBalance ?: fallback
     }
 
-    fun visualHall(context: android.content.Context): VisualHallOverride? {
+    fun visualHall(
+        context: android.content.Context,
+        currentDisplayName: String? = null,
+        currentUsername: String? = null
+    ): VisualHallOverride? {
         val plugin = activePlugin(context) ?: return null
         val balance = plugin.visualBalance ?: return null
         return VisualHallOverride(
             balance = balance,
             rank = plugin.visualHallRank ?: 1,
-            displayName = plugin.visualDisplayName ?: "Я",
-            username = plugin.visualUsername ?: "me"
+            displayName = if (plugin.useCurrentUser) currentDisplayName?.takeIf { it.isNotBlank() } ?: plugin.visualDisplayName ?: "Я" else plugin.visualDisplayName ?: "Я",
+            username = if (plugin.useCurrentUser) currentUsername?.trim()?.removePrefix("@")?.takeIf { it.isNotBlank() } ?: plugin.visualUsername ?: "" else plugin.visualUsername ?: ""
         )
     }
 }
