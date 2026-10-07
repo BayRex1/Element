@@ -1,34 +1,28 @@
-name: Build APK
+name: Create Signing Key
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
-  build:
+  create-key:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Create keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore element.jks \
+            -storepass ElementKey123! \
+            -keypass ElementKey123! \
+            -alias element \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Element, OU=Android, O=Element, L=London, ST=London, C=GB"
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v4
-
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: element-debug-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload keystore
+        uses: actions/upload-artifact@v4
+        with:
+          name: element-signing-key
+          path: element.jks
