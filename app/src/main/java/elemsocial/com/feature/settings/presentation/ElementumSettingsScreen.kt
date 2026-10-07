@@ -3,6 +3,7 @@ package elemsocial.com.feature.settings.presentation
 import androidx.annotation.DrawableRes
 import android.provider.OpenableColumns
 import android.widget.Toast
+import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -37,6 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
+import java.io.ByteArrayInputStream
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -283,7 +287,26 @@ private fun ElementumPluginsModal(
                             Box(
                                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(ElementUiPalette.BlockSoft),
                                 contentAlignment = Alignment.Center
-                            ) { Text(plugin.icon.ifBlank { "🧩" }, fontSize = 24.sp) }
+                            ) {
+                                val iconBitmap = remember(plugin.id, plugin.iconBase64) {
+                                    plugin.iconBase64?.let { encoded ->
+                                        runCatching {
+                                            val bytes = Base64.decode(encoded, Base64.DEFAULT)
+                                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                                        }.getOrNull()
+                                    }
+                                }
+                                if (iconBitmap != null) {
+                                    androidx.compose.foundation.Image(
+                                        bitmap = iconBitmap,
+                                        contentDescription = plugin.name,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                    )
+                                } else {
+                                    Text(plugin.icon.ifBlank { "🧩" }, fontSize = 24.sp)
+                                }
+                            }
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(plugin.name, color = ElementUiPalette.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
