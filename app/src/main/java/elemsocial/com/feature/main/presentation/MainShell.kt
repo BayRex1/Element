@@ -901,9 +901,11 @@ fun MainShell(
                         }
 
                         MainTab.Music -> key(musicRouteId, refreshKey(musicRouteId)) {
-                            MessengerWebScreen(
-                                sessionKey = activeAccountSessionKey,
-                                initialPath = "/music",
+                            MusicScreen(
+                                homeGateway = homeGateway,
+                                topPadding = ShellContentTopPadding,
+                                bottomPadding = ShellContentBottomPadding,
+                                transparencyMode = transparencyMode,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
