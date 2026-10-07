@@ -1,5 +1,6 @@
 package elemsocial.com.feature.main.presentation
 
+import elemsocial.com.core.ws.ElementSocketClient
 import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.text.format.Formatter
@@ -243,6 +244,7 @@ fun MainShell(
     onAddAccount: () -> Unit,
     onLogout: () -> Unit,
     onNotificationsCountChange: (Int) -> Unit,
+    socketClient: ElementSocketClient,
     modifier: Modifier = Modifier
 ) {
     var currentTab by remember { mutableStateOf(MainTab.Home) }
@@ -894,8 +896,9 @@ fun MainShell(
                         }
 
                         MainTab.Messenger -> key(messengerRouteId, refreshKey(messengerRouteId)) {
-                            MessengerWebScreen(
-                                sessionKey = activeAccountSessionKey,
+                            MessengerScreen(
+                                socketClient = socketClient,
+                                accountId = accountId,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
