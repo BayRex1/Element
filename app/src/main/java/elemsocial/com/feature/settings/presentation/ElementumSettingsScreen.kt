@@ -1,6 +1,9 @@
 package elemsocial.com.feature.settings.presentation
 
 import androidx.annotation.DrawableRes
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,14 +21,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +43,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import elemsocial.com.R
+import elemsocial.com.core.plugins.ElementPlugin
+import elemsocial.com.core.plugins.ElementPluginStore
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import elemsocial.com.ui.pack.UIKit
 import elemsocial.com.ui.pack.theme.ElementUiPalette
 
@@ -190,33 +201,113 @@ private fun ElementumMenuRow(
 private fun ElementumPluginsModal(
     onClose: () -> Unit
 ) {
+    val context = LocalContext.current
+    val store = remember { ElementPluginStore(context) }
+    var refreshKey by remember { mutableStateOf(0) }
+    var settingsPlugin by remember { mutableStateOf<ElementPlugin?>(null) }
+    val plugins = remember(refreshKey) { store.loadAll() }
+
+    val picker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            val name = uri.lastPathSegment.orEmpty()
+            require(name.lowercase().endsWith(".plugin")) { "Выберите файл с расширением .plugin" }
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: error("Не удалось прочитать файл")
+            store.savePlugin(bytes, name).getOrThrow()
+        }.onSuccess {
+            refreshKey++
+            Toast.makeText(context, "Плагин «${it.name}» установлен", Toast.LENGTH_SHORT).show()
+        }.onFailure {
+            Toast.makeText(context, "Ошибка плагина: ${it.message ?: "неверный файл"}", Toast.LENGTH_LONG).show()
+        }
+    }
+
     UIKit.RoutedModal(
         title = "Плагины",
-        onClose = onClose
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 4.dp, bottom = 10.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = "В разработке",
-                    color = ElementUiPalette.TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "Раздел плагинов появится позже",
-                    color = ElementUiPalette.TextSecondary,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center
+        onClose = onClose,
+        trailing = {
+            androidx.compose.material3.IconButton(onClick = { picker.launch(arrayOf("*/*")) }) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Добавить плагин",
+                    tint = ElementUiPalette.TextPrimary
                 )
             }
         }
+    ) {
+        if (plugins.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Плагинов пока нет", color = ElementUiPalette.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Нажмите + в правом верхнем углу и выберите .plugin", color = ElementUiPalette.TextSecondary, fontSize = 14.sp, textAlign = TextAlign.Center)
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                plugins.forEach { plugin ->
+                    UIKit.Block(modifier = Modifier.fillMaxWidth(), showShadow = false) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(ElementUiPalette.BlockSoft),
+                                contentAlignment = Alignment.Center
+                            ) { Text(plugin.icon.ifBlank { "🧩" }, fontSize = 24.sp) }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(plugin.name, color = ElementUiPalette.TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                if (plugin.description.isNotBlank()) {
+                                    Text(plugin.description, color = ElementUiPalette.TextSecondary, fontSize = 12.sp, maxLines = 2)
+                                }
+                                Text("v${plugin.version} · ${plugin.author}", color = ElementUiPalette.TextLite, fontSize = 11.sp)
+                            }
+
+                            androidx.compose.material3.IconButton(onClick = { settingsPlugin = plugin }) {
+                                Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = ElementUiPalette.TextSecondary)
+                            }
+                            androidx.compose.material3.IconButton(onClick = {
+                                store.delete(plugin)
+                                refreshKey++
+                                Toast.makeText(context, "Плагин удалён", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = ElementUiPalette.Error)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    settingsPlugin?.let { plugin ->
+        AlertDialog(
+            onDismissRequest = { settingsPlugin = null },
+            title = { Text(plugin.name) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(plugin.description.ifBlank { "Настройки отсутствуют" })
+                    if (plugin.settings.isNotEmpty()) {
+                        plugin.settings.forEach { (key, value) ->
+                            Text("$key: $value", fontSize = 13.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { settingsPlugin = null }) { Text("Готово") } }
+        )
     }
 }
