@@ -716,8 +716,6 @@ fun MainShell(
                                 onOpenProfile = { username ->
                                     openProfile(username)
                                 },
-                                currentDisplayName = accountName,
-                                currentUsername = accountUsername,
                                 topPadding = ShellContentTopPadding,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -807,8 +805,6 @@ fun MainShell(
                                 onOpenProfile = { username ->
                                     openProfile(username)
                                 },
-                                currentDisplayName = accountName,
-                                currentUsername = accountUsername,
                                 onOpenPost = ::openPost,
                                 onOpenMessenger = {
                                     navigateToTab(MainTab.Messenger)
@@ -842,8 +838,6 @@ fun MainShell(
                                 onOpenProfile = { username ->
                                     openProfile(username)
                                 },
-                                currentDisplayName = accountName,
-                                currentUsername = accountUsername,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -857,8 +851,6 @@ fun MainShell(
                                 onOpenProfile = { username ->
                                     openProfile(username)
                                 },
-                                currentDisplayName = accountName,
-                                currentUsername = accountUsername,
                                 topPadding = ShellContentTopPadding,
                                 bottomPadding = ShellContentBottomPadding,
                                 modifier = Modifier.fillMaxSize()
