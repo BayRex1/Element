@@ -48,12 +48,39 @@ class MusicRemoteDataSource(
         )
     }
 
-    suspend fun toggleLike(trackId: Int): Map<String, Any?> {
+    suspend fun addFavorite(trackId: Int): Map<String, Any?> = socketClient.sendRequest(
+        mapOf(
+            "type" to "social",
+            "action" to "music/fav/add",
+            "payload" to mapOf("song_id" to trackId)
+        )
+    )
+
+    suspend fun removeFavorite(trackId: Int): Map<String, Any?> = socketClient.sendRequest(
+        mapOf(
+            "type" to "social",
+            "action" to "music/fav/remove",
+            "payload" to mapOf("song_id" to trackId)
+        )
+    )
+
+    suspend fun editPlaylist(
+        playlistId: Int,
+        name: String? = null,
+        description: String? = null,
+        privacy: Int? = null,
+        coverBytes: ByteArray? = null
+    ): Map<String, Any?> {
+        val payload = linkedMapOf<String, Any?>("playlist_id" to playlistId)
+        name?.let { payload["name"] = it }
+        description?.let { payload["description"] = it }
+        privacy?.let { payload["privacy"] = it }
+        coverBytes?.let { payload["cover"] = it }
         return socketClient.sendRequest(
             mapOf(
                 "type" to "social",
-                "action" to "music/fav/add",
-                "payload" to mapOf("song_id" to trackId)
+                "action" to "music/playlists/edit",
+                "payload" to payload
             )
         )
     }
