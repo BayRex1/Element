@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +66,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import elemsocial.com.R
 import elemsocial.com.core.time.formatTimeAge
+import elemsocial.com.core.plugins.ElementPluginRuntime
 import elemsocial.com.domain.model.AuthGoldHistory
 import elemsocial.com.domain.model.PostImageAsset
 import elemsocial.com.domain.model.WalletReferralDashboard
@@ -97,7 +99,9 @@ fun WalletScreen(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
-    var balance by remember { mutableStateOf(initialBalance ?: 0.0) }
+    val context = LocalContext.current
+    val visualBalance = ElementPluginRuntime.visualBalance(context, initialBalance ?: 0.0)
+    var balance by remember(initialBalance, visualBalance) { mutableStateOf(visualBalance) }
     var activeTab by remember { mutableStateOf(0) }
     var transferOpen by remember { mutableStateOf(false) }
     var history by remember { mutableStateOf<List<WalletTransaction>>(emptyList()) }
@@ -115,10 +119,8 @@ fun WalletScreen(
     var referralHasMore by remember { mutableStateOf(true) }
     var referralStartIndex by remember { mutableStateOf(0) }
 
-    LaunchedEffect(initialBalance) {
-        if (initialBalance != null) {
-            balance = initialBalance
-        }
+    LaunchedEffect(initialBalance, visualBalance) {
+        balance = visualBalance
     }
 
     LaunchedEffect(goldStatus) {
