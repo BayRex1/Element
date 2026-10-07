@@ -1314,7 +1314,9 @@ private fun rememberAssetBitmap(
     val bytes = runCatching { loadImageBytes(source) }.getOrNull() ?: return@produceState
     if (bytes.isEmpty()) return@produceState
 
-    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    val bitmap = withContext(Dispatchers.Default) {
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    }
     value = bitmap?.asImageBitmap()
 }
 
