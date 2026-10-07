@@ -100,7 +100,13 @@ class MusicRepositoryImpl(
     }
 
     override suspend fun toggleLike(trackId: Int): ActionResult {
-        return actionResult(remote.toggleLike(trackId))
+        val current = loadTrack(trackId).data
+        val response = if (current?.liked == true) {
+            remote.removeFavorite(trackId)
+        } else {
+            remote.addFavorite(trackId)
+        }
+        return actionResult(response)
     }
 
     override suspend fun createPlaylist(name: String, description: String): MusicResult<Int> {
