@@ -1,6 +1,5 @@
 package elemsocial.com.feature.music.presentation
 
-import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -126,7 +125,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
@@ -3691,9 +3689,7 @@ private fun rememberMusicBitmap(
     homeGateway: HomeGateway
 ) = produceState<ImageBitmap?>(initialValue = null, key1 = asset?.cacheKey) {
     val source = asset ?: return@produceState
-    val bytes = runCatching { homeGateway.loadImageBytes(source) }.getOrNull() ?: return@produceState
-    if (bytes.isEmpty()) return@produceState
-    value = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    value = runCatching { homeGateway.loadImageBitmap(source) }.getOrNull()
 }
 
 private fun postSongToTrack(song: PostSong): MusicTrack {
