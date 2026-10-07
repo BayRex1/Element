@@ -1,6 +1,7 @@
 package elemsocial.com.feature.settings.presentation
 
 import androidx.annotation.DrawableRes
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -212,10 +213,26 @@ private fun ElementumPluginsModal(
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         runCatching {
-            val name = uri.lastPathSegment.orEmpty()
-            require(name.lowercase().endsWith(".plugin")) { "Выберите файл с расширением .plugin" }
+            val name = context.contentResolver.query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+                } else null
+            }?.takeIf { it.isNotBlank() }
+                ?: uri.lastPathSegment.orEmpty().substringAfterLast('/')
+
+            require(name.lowercase(java.util.Locale.ROOT).endsWith(".plugin")) {
+                "Выберите файл с расширением .plugin"
+            }
+
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: error("Не удалось прочитать файл")
+            require(bytes.isNotEmpty()) { "Файл плагина пуст" }
             store.savePlugin(bytes, name).getOrThrow()
         }.onSuccess {
             refreshKey++
