@@ -63,6 +63,8 @@ fun HallScreen(
     hallGateway: HallGateway,
     homeGateway: HomeGateway,
     onOpenProfile: (String) -> Unit,
+    currentDisplayName: String? = null,
+    currentUsername: String? = null,
     topPadding: Dp = 0.dp,
     bottomPadding: Dp = 90.dp,
     modifier: Modifier = Modifier
@@ -92,7 +94,11 @@ fun HallScreen(
         loadHall()
     }
 
-    val visualHall = ElementPluginRuntime.visualHall(context)
+    val visualHall = ElementPluginRuntime.visualHall(
+        context = context,
+        currentDisplayName = currentDisplayName,
+        currentUsername = currentUsername
+    )
     val shownUsers = if (visualHall != null) {
         val fakeUser = HallUser(
             id = -999999,
@@ -299,6 +305,8 @@ private fun PodiumPlace(
     height: Float,
     gradient: Brush,
     onOpenProfile: (String) -> Unit,
+    currentDisplayName: String? = null,
+    currentUsername: String? = null,
     homeGateway: HomeGateway,
     modifier: Modifier = Modifier
 ) {
