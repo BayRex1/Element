@@ -626,6 +626,7 @@ class MainActivity : ComponentActivity() {
                                         onNotificationsCountChange = { next ->
                                             notificationsCount = next.coerceAtLeast(0)
                                         },
+                                        socketClient = socketClient,
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
