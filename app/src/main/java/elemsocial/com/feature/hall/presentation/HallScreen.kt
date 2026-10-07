@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import elemsocial.com.R
 import elemsocial.com.domain.model.HallUser
+import elemsocial.com.core.plugins.ElementPluginRuntime
 import elemsocial.com.domain.model.PostImageAsset
 import elemsocial.com.feature.home.presentation.HomeGateway
 import elemsocial.com.ui.pack.UIKit
@@ -66,6 +68,7 @@ fun HallScreen(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var loading by remember { mutableStateOf(false) }
     var users by remember { mutableStateOf<List<HallUser>>(emptyList()) }
     var errorText by remember { mutableStateOf<String?>(null) }
@@ -89,9 +92,22 @@ fun HallScreen(
         loadHall()
     }
 
-    val first = users.getOrNull(0)
-    val second = users.getOrNull(1)
-    val third = users.getOrNull(2)
+    val visualHall = ElementPluginRuntime.visualHall(context)
+    val shownUsers = if (visualHall != null) {
+        val fakeUser = HallUser(
+            id = -999999,
+            name = visualHall.displayName,
+            username = visualHall.username,
+            eballs = visualHall.balance
+        )
+        listOf(fakeUser) + users.filterNot { it.username.equals(fakeUser.username, ignoreCase = true) }
+    } else {
+        users
+    }
+
+    val first = shownUsers.getOrNull(0)
+    val second = shownUsers.getOrNull(1)
+    val third = shownUsers.getOrNull(2)
 
     LazyColumn(
         modifier = modifier
@@ -195,7 +211,7 @@ fun HallScreen(
         }
 
         itemsIndexed(
-            items = users.drop(3),
+            items = shownUsers.drop(3),
             key = { index, user -> "${user.id}:${user.username}:$index" }
         ) { _, user ->
             Box(
