@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import android.graphics.BitmapFactory
 import java.io.ByteArrayInputStream
@@ -306,16 +307,19 @@ private fun ElementumPluginsModal(
                                     if (iconBitmap == null && homeGateway != null && plugin.icon.startsWith("post/")) {
                                         val postId = plugin.icon.removePrefix("post/").trim().toIntOrNull()
                                         if (postId != null) {
-                                            val loaded = runCatching { homeGateway.loadPost(postId).post?.content?.images?.firstOrNull()?.asset }
-                                                .getOrNull()
-                                                ?.let { asset -> runCatching { homeGateway.loadImageBitmap(asset) }.getOrNull() }
+                                            val loaded: ImageBitmap? = runCatching {
+                                                homeGateway.loadPost(postId).post?.content?.images?.firstOrNull()?.asset
+                                            }.getOrNull()?.let { asset ->
+                                                runCatching { homeGateway.loadImageBitmap(asset) }.getOrNull()
+                                            }
                                             if (loaded != null) iconBitmap = loaded
                                         }
                                     }
                                 }
-                                if (iconBitmap != null) {
+                                val bitmap = iconBitmap
+                                if (bitmap != null) {
                                     androidx.compose.foundation.Image(
-                                        bitmap = iconBitmap,
+                                        bitmap = bitmap,
                                         contentDescription = plugin.name,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
