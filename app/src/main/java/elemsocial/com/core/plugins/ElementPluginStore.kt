@@ -48,7 +48,9 @@ class ElementPluginStore(private val context: Context) {
             visualHallRank = visual?.optInt("hall_rank", 1),
             visualDisplayName = visual?.optString("display_name")?.takeIf { it.isNotBlank() },
             visualUsername = visual?.optString("username")?.takeIf { it.isNotBlank() },
-            useCurrentUser = visual?.optBoolean("use_current_user", true) ?: true
+            useCurrentUser = visual?.optBoolean("use_current_user", true) ?: true,
+            entryClass = root.optString("entry_class")?.takeIf { it.isNotBlank() },
+            codeDexBase64 = root.optString("code_dex_base64")?.takeIf { it.isNotBlank() }
         )
     }.getOrNull()
 }
