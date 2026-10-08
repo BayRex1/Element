@@ -14,6 +14,7 @@ import dalvik.system.DexClassLoader
 import elemsocial.com.core.ws.ElementSocketClient
 import elemsocial.com.ui.pack.theme.ElementUiPalette
 import java.io.File
+import org.json.JSONObject
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
@@ -303,9 +304,11 @@ object ElementPluginRuntime {
             pythonHooks.getOrPut(event) { CopyOnWriteArrayList() }.add(callback)
         }
         fun unregister_hook(event: String, callback: PyObject) { pythonHooks[event]?.removeAll { it === callback } }
-        fun set_theme(overrides: Map<String, Any?>) {
+        fun set_theme_json(json: String) {
+            val overrides = runCatching { JSONObject(json) }.getOrNull() ?: return
             fun color(key: String): Int? {
-                val raw = overrides[key]?.toString()?.trim()?.removePrefix("#") ?: return null
+                val raw = overrides.optString(key, "").trim().removePrefix("#")
+                if (raw.isBlank()) return null
                 return runCatching {
                     val value = raw.toLong(16).toInt()
                     if (raw.length <= 6) 0xFF000000.toInt() or value else value
@@ -319,11 +322,16 @@ object ElementPluginRuntime {
             ))
         }
         fun reset_theme() { ElementUiPalette.clearPluginOverrides() }
-        fun server_request(type: String, action: String, payload: Map<String, Any?>, timeoutMs: Int): Map<String, Any?> {
+        fun server_request(type: String, action: String, payloadJson: String, timeoutMs: Int): Map<String, Any?> {
+            val payload = jsonObjectToMap(runCatching { JSONObject(payloadJson) }.getOrNull())
             val response = runBlocking(Dispatchers.IO) {
                 val client = socket ?: return@runBlocking ElementPluginServerResponse(false, null, "Socket client unavailable", emptyMap(), emptyMap())
                 runCatching {
-                    val raw = client.sendRequest(buildMap { put("type", type); put("action", action); if (payload.isNotEmpty()) put("payload", payload) }, timeoutMs.toLong().coerceIn(1_000, 120_000))
+                    val raw = client.sendRequest(buildMap {
+                        put("type", type)
+                        put("action", action)
+                        if (payload.isNotEmpty()) put("payload", payload)
+                    }, timeoutMs.toLong().coerceIn(1_000, 120_000))
                     val status = raw["status"]?.toString()
                     val message = raw["message"]?.toString() ?: raw["error"]?.toString()
                     val ok = when (status?.lowercase()) { null, "", "ok", "success", "200", "201" -> raw["error"] == null; else -> false }
@@ -332,6 +340,22 @@ object ElementPluginRuntime {
                 }.getOrElse { ElementPluginServerResponse(false, null, it.message, emptyMap(), emptyMap()) }
             }
             return mapOf("ok" to response.ok, "status" to response.status, "message" to response.message, "data" to response.data, "raw" to response.raw)
+        }
+
+        private fun jsonObjectToMap(json: JSONObject?): Map<String, Any?> {
+            if (json == null) return emptyMap()
+            return buildMap {
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val value = json.opt(key)
+                    put(key, when (value) {
+                        is JSONObject -> jsonObjectToMap(value)
+                        JSONObject.NULL -> null
+                        else -> value
+                    })
+                }
+            }
         }
     }
 
