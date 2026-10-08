@@ -1129,19 +1129,6 @@ fun MainShell(
             showShadow = currentTab != MainTab.Settings
         )
 
-        pluginUiScreen?.let { screen ->
-            ElementPluginScreen(
-                screen = screen,
-                onBack = { ElementPluginRuntime.closeUiScreen() },
-                onAction = { callbackId, payloadJson ->
-                    ElementPluginRuntime.invokeUiCallback(callbackId, payloadJson)
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = ShellContentTopPadding)
-            )
-        }
-
         if (currentTab == MainTab.Music && false) {
             MusicMiniPlayerBar(
                 homeGateway = homeGateway,
@@ -1341,6 +1328,17 @@ fun MainShell(
                     homeGateway = homeGateway
                 )
             }
+        }
+
+        pluginUiScreen?.let { screen ->
+            ElementPluginScreen(
+                screen = screen,
+                onBack = { ElementPluginRuntime.closeUiScreen() },
+                onAction = { callbackId, payloadJson ->
+                    ElementPluginRuntime.invokeUiCallback(callbackId, payloadJson)
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         if (elementumSettingsOpen) {
