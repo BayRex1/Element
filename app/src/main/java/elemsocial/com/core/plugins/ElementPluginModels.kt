@@ -273,15 +273,15 @@ object ElementPluginRuntime {
             context.applicationContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             true
         }.getOrDefault(false)
-        fun current_user(): Map<String, Any?> = mapOf(
+        fun current_user_json(): String = JSONObject(mapOf(
             "id" to currentUserValue.id, "name" to currentUserValue.name,
             "username" to currentUserValue.username, "email" to currentUserValue.email
-        )
-        fun app_info(): Map<String, Any?> = mapOf(
+        )).toString()
+        fun app_info_json(): String = JSONObject(mapOf(
             "api_version" to ELEMENT_PLUGIN_SCRIPT_API_VERSION,
             "application_id" to appInfoValue.applicationId,
             "version_name" to appInfoValue.versionName, "version_code" to appInfoValue.versionCode
-        )
+        )).toString()
         fun connection_state(): String = socket?.connectionState?.value?.name
             ?: ElementSocketClient.ConnectionState.Disconnected.name
         private fun prefs() = context.getSharedPreferences("element_plugin_" + plugin.id, Context.MODE_PRIVATE)
@@ -322,7 +322,7 @@ object ElementPluginRuntime {
             ))
         }
         fun reset_theme() { ElementUiPalette.clearPluginOverrides() }
-        fun server_request(type: String, action: String, payloadJson: String, timeoutMs: Int): Map<String, Any?> {
+        fun server_request(type: String, action: String, payloadJson: String, timeoutMs: Int): String {
             val payload = jsonObjectToMap(runCatching { JSONObject(payloadJson) }.getOrNull())
             val response = runBlocking(Dispatchers.IO) {
                 val client = socket ?: return@runBlocking ElementPluginServerResponse(false, null, "Socket client unavailable", emptyMap(), emptyMap())
@@ -339,7 +339,7 @@ object ElementPluginRuntime {
                     ElementPluginServerResponse(ok, status, message, data, raw)
                 }.getOrElse { ElementPluginServerResponse(false, null, it.message, emptyMap(), emptyMap()) }
             }
-            return mapOf("ok" to response.ok, "status" to response.status, "message" to response.message, "data" to response.data, "raw" to response.raw)
+            return JSONObject(mapOf("ok" to response.ok, "status" to response.status, "message" to response.message, "data" to response.data, "raw" to response.raw)).toString()
         }
 
         private fun jsonObjectToMap(json: JSONObject?): Map<String, Any?> {
@@ -361,7 +361,7 @@ object ElementPluginRuntime {
 
     private fun dispatchPythonHook(event: String, payload: Map<String, Any?>) {
         pythonHooks[event]?.toList()?.forEach { callback ->
-            runCatching { callback.call(payload) }.onFailure {
+            runCatching { callback.call(JSONObject(payload).toString()) }.onFailure {
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(appContext, "Plugin hook " + event + ": " + (it.message ?: "error"), Toast.LENGTH_SHORT).show()
                 }
