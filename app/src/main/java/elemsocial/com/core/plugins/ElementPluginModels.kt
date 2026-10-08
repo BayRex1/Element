@@ -214,7 +214,10 @@ object ElementPluginRuntime {
     private fun loadPlugin(context: Context, plugin: ElementPlugin) {
         val className = plugin.entryClass?.trim().orEmpty()
         val encoded = plugin.codeDexBase64?.trim().orEmpty()
-        if (className.isBlank() || encoded.isBlank()) return
+        if (className.isBlank() || encoded.isBlank()) {
+            loadScriptPlugin(context, plugin)
+            return
+        }
         runCatching {
             val bytes = Base64.decode(encoded, Base64.DEFAULT)
             require(bytes.isNotEmpty()) { "Пустой DEX" }
@@ -228,6 +231,108 @@ object ElementPluginRuntime {
         }
     }
 
+    private fun loadScriptPlugin(context: Context, plugin: ElementPlugin) {
+        runCatching {
+            val file = File(context.filesDir, "plugins/" + plugin.fileName)
+            require(file.isFile) { "Файл плагина не найден" }
+            val bridge = PythonPluginBridge(context, plugin)
+            val instance = Python.getInstance().getModule("element_plugin_runtime")
+                .callAttr("load_plugin", file.absolutePath, bridge)
+            pythonLoaded += plugin to instance
+        }.onFailure {
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Плагин «" + plugin.name + "»: " + (it.message ?: "ошибка загрузки"), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private inner class PythonPluginBridge(
+        private val context: Context,
+        private val plugin: ElementPlugin
+    ) {
+        fun show_toast(message: String, long: Boolean) {
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context.applicationContext, message, if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+            }
+        }
+        fun open_post(postId: Int): Boolean = postOpener?.invoke(postId) == true
+        fun open_profile(username: String): Boolean = profileOpener?.invoke(username) == true
+        fun open_url(url: String): Boolean = runCatching {
+            context.applicationContext.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            true
+        }.getOrDefault(false)
+        fun current_user(): Map<String, Any?> = mapOf(
+            "id" to currentUserValue.id, "name" to currentUserValue.name,
+            "username" to currentUserValue.username, "email" to currentUserValue.email
+        )
+        fun app_info(): Map<String, Any?> = mapOf(
+            "api_version" to ELEMENT_PLUGIN_SCRIPT_API_VERSION,
+            "application_id" to appInfoValue.applicationId,
+            "version_name" to appInfoValue.versionName, "version_code" to appInfoValue.versionCode
+        )
+        fun connection_state(): String = socket?.connectionState?.value?.name
+            ?: ElementSocketClient.ConnectionState.Disconnected.name
+        private fun prefs() = context.getSharedPreferences("element_plugin_" + plugin.id, Context.MODE_PRIVATE)
+        fun storage_get(key: String): String? = prefs().getString(key, null)
+        fun storage_put(key: String, value: String) { prefs().edit().putString(key, value).apply() }
+        fun storage_remove(key: String) { prefs().edit().remove(key).apply() }
+        fun storage_clear() { prefs().edit().clear().apply() }
+        fun register_bottom_button(itemId: String, title: String, icon: String, callback: PyObject, badge: Int?): Map<String, Any?> {
+            registrations.removeAll { it.pluginId == plugin.id && it.itemId == itemId }
+            registrations += ElementPluginNavItem(plugin.id, itemId, title, icon, null, badge) {
+                runCatching { callback.call() }.onFailure { show_toast("Plugin error: " + (it.message ?: "unknown"), true) }
+            }
+            publish()
+            return mapOf("plugin_id" to plugin.id, "item_id" to itemId)
+        }
+        fun unregister_bottom_button(itemId: String) {
+            registrations.removeAll { it.pluginId == plugin.id && it.itemId == itemId }; publish()
+        }
+        fun register_hook(event: String, callback: PyObject) {
+            pythonHooks.getOrPut(event) { CopyOnWriteArrayList() }.add(callback)
+        }
+        fun unregister_hook(event: String, callback: PyObject) { pythonHooks[event]?.removeAll { it === callback } }
+        fun set_theme(overrides: Map<String, Any?>) {
+            fun color(key: String): Int? {
+                val raw = overrides[key]?.toString()?.trim()?.removePrefix("#") ?: return null
+                return runCatching {
+                    val value = raw.toLong(16).toInt()
+                    if (raw.length <= 6) 0xFF000000.toInt() or value else value
+                }.getOrNull()
+            }
+            ElementUiPalette.applyPluginOverrides(ElementPluginThemeOverrides(
+                accentArgb = color("accent"), bodyArgb = color("body"), blockArgb = color("block"),
+                blockSoftArgb = color("block_soft"), textPrimaryArgb = color("text_primary"),
+                textSecondaryArgb = color("text_secondary"), errorArgb = color("error"),
+                successArgb = color("success"), infoArgb = color("info")
+            ))
+        }
+        fun reset_theme() { ElementUiPalette.clearPluginOverrides() }
+        fun server_request(type: String, action: String, payload: Map<String, Any?>, timeoutMs: Int): Map<String, Any?> {
+            val response = runBlocking(Dispatchers.IO) {
+                val client = socket ?: return@runBlocking ElementPluginServerResponse(false, null, "Socket client unavailable", emptyMap(), emptyMap())
+                runCatching {
+                    val raw = client.sendRequest(buildMap { put("type", type); put("action", action); if (payload.isNotEmpty()) put("payload", payload) }, timeoutMs.toLong().coerceIn(1_000, 120_000))
+                    val status = raw["status"]?.toString()
+                    val message = raw["message"]?.toString() ?: raw["error"]?.toString()
+                    val ok = when (status?.lowercase()) { null, "", "ok", "success", "200", "201" -> raw["error"] == null; else -> false }
+                    val data = (raw["data"] as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value } ?: raw
+                    ElementPluginServerResponse(ok, status, message, data, raw)
+                }.getOrElse { ElementPluginServerResponse(false, null, it.message, emptyMap(), emptyMap()) }
+            }
+            return mapOf("ok" to response.ok, "status" to response.status, "message" to response.message, "data" to response.data, "raw" to response.raw)
+        }
+    }
+
+    private fun dispatchPythonHook(event: String, payload: Map<String, Any?>) {
+        pythonHooks[event]?.toList()?.forEach { callback ->
+            runCatching { callback.call(payload) }.onFailure {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(appContext, "Plugin hook " + event + ": " + (it.message ?: "error"), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     private fun createHost(context: Context, plugin: ElementPlugin): ElementPluginHostV2 =
         object : ElementPluginHostV2 {
             override fun registerBottomNavigation(item: ElementPluginBottomNavItem): ElementPluginRegistration {
