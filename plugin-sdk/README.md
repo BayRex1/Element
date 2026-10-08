@@ -74,3 +74,34 @@ Supported script APIs include:
 - `__icon__ = "post/<id>"` for using a post image as the plugin icon.
 
 Legacy JSON + DEX plugins remain supported.
+
+## Python Plugin UI API v4
+
+Script plugins can create full Element-style screens from Python. UI is declarative and callbacks receive Python dictionaries.
+
+Example:
+
+    def open_test(self):
+        self.ui.screen(
+            id="test",
+            title="Plugin Test",
+            content=[
+                self.ui.title("Element Plugin UI"),
+                self.ui.text("Полноценный экран плагина"),
+                self.ui.card(
+                    title="Настройки",
+                    text="Пример компонентов",
+                    children=[
+                        self.ui.button("Нажми меня", on_click=self.clicked),
+                        self.ui.switch("Тестовый режим", value=True, on_change=self.changed),
+                        self.ui.input("Имя", value="", placeholder="Введите имя", on_change=self.name_changed),
+                    ],
+                ),
+            ],
+        )
+
+Available UI builders: text, title, button, soft_button, switch, checkbox, input, divider, spacer, card, column, row, screen, close.
+
+Callback payloads: button {}, switch/checkbox {"value": bool}, input {"value": str}.
+
+The screen uses Element's native visual palette and the bottom navigation is hidden while a plugin screen is open.
