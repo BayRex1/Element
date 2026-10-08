@@ -180,6 +180,7 @@ object ElementPluginRuntime {
     ) {
         unloadAll()
         val app = context.applicationContext
+        appContext = app
         manager = onOpenPluginManager
         socket = socketClient
         currentUserValue = user
@@ -208,6 +209,7 @@ object ElementPluginRuntime {
         postOpener = null
         profileOpener = null
         socket = null
+        appContext = null
     }
 
     fun setUser(user: ElementPluginUser) { currentUserValue = user }
