@@ -65,6 +65,7 @@ fun HallScreen(
     onOpenProfile: (String) -> Unit,
     currentDisplayName: String? = null,
     currentUsername: String? = null,
+    currentAvatar: PostImageAsset? = null,
     topPadding: Dp = 0.dp,
     bottomPadding: Dp = 90.dp,
     modifier: Modifier = Modifier
@@ -97,14 +98,16 @@ fun HallScreen(
     val visualHall = ElementPluginRuntime.visualHall(
         context = context,
         currentDisplayName = currentDisplayName,
-        currentUsername = currentUsername
+        currentUsername = currentUsername,
+        currentAvatar = currentAvatar
     )
     val shownUsers = if (visualHall != null) {
         val fakeUser = HallUser(
             id = -999999,
             name = visualHall.displayName,
             username = visualHall.username,
-            eballs = visualHall.balance
+            eballs = visualHall.balance,
+            avatar = visualHall.avatar
         )
         listOf(fakeUser) + users.filterNot { it.username.equals(fakeUser.username, ignoreCase = true) }
     } else {
