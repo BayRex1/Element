@@ -21,7 +21,10 @@ class _Theme:
     def __init__(self, bridge):
         self._bridge = bridge
     def set(self, **kwargs):
-        self._bridge.set_theme(kwargs)
+        # Pass JSON instead of a Python dict: Chaquopy does not reliably
+        # convert arbitrary Python dicts to Kotlin Map parameters.
+        import json
+        self._bridge.set_theme_json(json.dumps(kwargs))
     def reset(self):
         self._bridge.reset_theme()
 
