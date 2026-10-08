@@ -13,6 +13,7 @@ import com.chaquo.python.android.AndroidPlatform
 import dalvik.system.DexClassLoader
 import elemsocial.com.core.ws.ElementSocketClient
 import elemsocial.com.ui.pack.theme.ElementUiPalette
+import elemsocial.com.domain.model.PostImageAsset
 import java.io.File
 import org.json.JSONObject
 import java.util.concurrent.CopyOnWriteArrayList
@@ -521,16 +522,23 @@ object ElementPluginRuntime {
     fun visualBalance(context: Context, fallback: Double): Double =
         ElementPluginStore(context).loadAll().firstOrNull()?.visualBalance ?: fallback
 
-    fun visualHall(context: Context, currentDisplayName: String? = null, currentUsername: String? = null): VisualHallOverride? {
+    fun visualHall(context: Context, currentDisplayName: String? = null, currentUsername: String? = null, currentAvatar: PostImageAsset? = null): VisualHallOverride?
         val plugin = ElementPluginStore(context).loadAll().firstOrNull() ?: return null
         val balance = plugin.visualBalance ?: return null
         return VisualHallOverride(
             balance,
             plugin.visualHallRank ?: 1,
             if (plugin.useCurrentUser) currentDisplayName?.takeIf { it.isNotBlank() } ?: plugin.visualDisplayName ?: "Я" else plugin.visualDisplayName ?: "Я",
-            if (plugin.useCurrentUser) currentUsername?.trim()?.removePrefix("@").takeIf { !it.isNullOrBlank() } ?: plugin.visualUsername ?: "" else plugin.visualUsername ?: ""
+            if (plugin.useCurrentUser) currentUsername?.trim()?.removePrefix("@").takeIf { !it.isNullOrBlank() } ?: plugin.visualUsername ?: "" else plugin.visualUsername ?: "",
+            if (plugin.useCurrentUser) currentAvatar else null
         )
     }
 }
 
-data class VisualHallOverride(val balance: Double, val rank: Int, val displayName: String, val username: String)
+data class VisualHallOverride(
+    val balance: Double,
+    val rank: Int,
+    val displayName: String,
+    val username: String,
+    val avatar: PostImageAsset? = null
+)
