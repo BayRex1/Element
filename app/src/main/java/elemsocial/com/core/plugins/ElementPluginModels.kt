@@ -86,9 +86,21 @@ data class ElementPluginBottomNavItem(
     val title: String,
     val icon: String = "🧩",
     val iconBase64: String? = null,
-    val badgeCount: Int? = null,
     val action: ElementPluginAction
-)
+) {
+    var badgeCount: Int? = null
+
+    constructor(
+        id: String,
+        title: String,
+        icon: String = "🧩",
+        iconBase64: String? = null,
+        badgeCount: Int? = null,
+        action: ElementPluginAction
+    ) : this(id, title, icon, iconBase64, action) {
+        this.badgeCount = badgeCount
+    }
+}
 
 data class ElementPluginRegistration(val pluginId: String, val itemId: String)
 
