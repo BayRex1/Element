@@ -1,0 +1,35 @@
+from element_plugin import BasePlugin
+
+__id__ = "plugin_lab"
+__name__ = "Plugin Lab"
+__description__ = "Проверка Python Plugin API"
+__version__ = "1.0.0"
+__author__ = "Element"
+__icon__ = "post/144376"
+
+class Plugin(BasePlugin):
+    def on_plugin_load(self):
+        self.toast("Plugin Lab загружен")
+        self.ui.bottom_button(
+            id="lab",
+            title="Lab",
+            icon="🧪",
+            on_click=self.open_lab,
+            badge=1,
+        )
+        self.hook("post.opened", self.on_post_opened)
+        self.hook("server.event", self.on_server_event)
+        self.theme.set(accent="#FF6D00")
+        self.storage.set("loaded", "1")
+
+    def open_lab(self):
+        self.toast("API v%s · Socket: %s" % (self.app["api_version"], self.connection_state), True)
+
+    def on_post_opened(self, event):
+        self.toast("Открыт пост #%s" % event.get("post_id"))
+
+    def on_server_event(self, event):
+        pass
+
+    def on_plugin_unload(self):
+        self.theme.reset()
