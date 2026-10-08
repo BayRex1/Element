@@ -522,7 +522,7 @@ object ElementPluginRuntime {
     fun visualBalance(context: Context, fallback: Double): Double =
         ElementPluginStore(context).loadAll().firstOrNull()?.visualBalance ?: fallback
 
-    fun visualHall(context: Context, currentDisplayName: String? = null, currentUsername: String? = null, currentAvatar: PostImageAsset? = null): VisualHallOverride?
+    fun visualHall(context: Context, currentDisplayName: String? = null, currentUsername: String? = null, currentAvatar: PostImageAsset? = null): VisualHallOverride? {
         val plugin = ElementPluginStore(context).loadAll().firstOrNull() ?: return null
         val balance = plugin.visualBalance ?: return null
         return VisualHallOverride(
