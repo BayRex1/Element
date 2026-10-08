@@ -124,6 +124,7 @@ object ElementPluginRuntime {
             val loader = DexClassLoader(
                 dexFile.absolutePath,
                 optimized.absolutePath,
+                null,
                 context.classLoader
             )
             val entry = loader.loadClass(className).getDeclaredConstructor().newInstance() as ElementPluginEntry
