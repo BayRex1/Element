@@ -48,7 +48,8 @@ class _Posts:
     def __init__(self, plugin):
         self._plugin = plugin
     def request(self, action, payload=None):
-        return self._plugin._bridge.server_request("social", str(action), payload or {})
+        import json
+        return self._plugin._bridge.server_request("social", str(action), json.dumps(payload or {}), 60000)
     def get(self, post_id):
         return self.request("load_post", {"post_id": int(post_id)})
     def comments(self, post_id):
@@ -82,7 +83,8 @@ class _Server:
     def __init__(self, plugin):
         self._plugin = plugin
     def request(self, type, action, payload=None, timeout_ms=60000):
-        return self._plugin._bridge.server_request(str(type), str(action), payload or {}, int(timeout_ms))
+        import json
+        return self._plugin._bridge.server_request(str(type), str(action), json.dumps(payload or {}), int(timeout_ms))
     def on(self, event, callback):
         return self._plugin.hook(event, callback)
 
