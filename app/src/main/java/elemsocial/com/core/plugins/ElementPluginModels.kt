@@ -361,7 +361,7 @@ object ElementPluginRuntime {
 
     private fun dispatchPythonHook(event: String, payload: Map<String, Any?>) {
         pythonHooks[event]?.toList()?.forEach { callback ->
-            runCatching { callback.call(JSONObject(payload).toString()) }.onFailure {
+            runCatching { callback.call(Python.getInstance().getModule("json").callAttr("loads", JSONObject(payload).toString())) }.onFailure {
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(appContext, "Plugin hook " + event + ": " + (it.message ?: "error"), Toast.LENGTH_SHORT).show()
                 }
