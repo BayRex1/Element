@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import elemsocial.com.R
 import elemsocial.com.core.plugins.ElementPlugin
 import elemsocial.com.core.plugins.ElementPluginStore
+import elemsocial.com.core.plugins.ElementPluginRuntime
 import elemsocial.com.feature.home.presentation.HomeGateway
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AlertDialog
@@ -143,7 +144,7 @@ fun ElementumSettingsScreen(
     }
 
     if (pluginsOpen) {
-        ElementumPluginsModal(onClose = { pluginsOpen = false }, homeGateway = homeGateway)
+        ElementumPluginsScreen(onClose = { pluginsOpen = false }, homeGateway = homeGateway)
     }
 }
 
@@ -207,7 +208,7 @@ private fun ElementumMenuRow(
 }
 
 @Composable
-private fun ElementumPluginsModal(
+fun ElementumPluginsScreen(
     onClose: () -> Unit,
     homeGateway: HomeGateway? = null
 ) {
@@ -245,6 +246,7 @@ private fun ElementumPluginsModal(
             store.savePlugin(bytes, name).getOrThrow()
         }.onSuccess {
             refreshKey++
+            ElementPluginRuntime.reload(context)
             Toast.makeText(context, "Плагин «${it.name}» установлен", Toast.LENGTH_SHORT).show()
         }.onFailure {
             Toast.makeText(context, "Ошибка плагина: ${it.message ?: "неверный файл"}", Toast.LENGTH_LONG).show()
@@ -345,6 +347,7 @@ private fun ElementumPluginsModal(
                             androidx.compose.material3.IconButton(onClick = {
                                 store.delete(plugin)
                                 refreshKey++
+                                ElementPluginRuntime.reload(context)
                                 Toast.makeText(context, "Плагин удалён", Toast.LENGTH_SHORT).show()
                             }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Удалить", tint = ElementUiPalette.Error)
