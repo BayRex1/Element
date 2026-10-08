@@ -49,7 +49,7 @@ class _Posts:
         self._plugin = plugin
     def request(self, action, payload=None):
         import json
-        return self._plugin._bridge.server_request("social", str(action), json.dumps(payload or {}), 60000)
+        return json.loads(self._plugin._bridge.server_request("social", str(action), json.dumps(payload or {}), 60000))
     def get(self, post_id):
         return self.request("load_post", {"post_id": int(post_id)})
     def comments(self, post_id):
@@ -75,9 +75,9 @@ class _Profiles:
         self._plugin = plugin
     def get(self, username):
         import json
-        return self._plugin._bridge.server_request(
+        return json.loads(self._plugin._bridge.server_request(
             "social", "profile/load", json.dumps({"username": str(username)}), 60000
-        )
+        ))
     def open(self, username):
         return bool(self._plugin._bridge.open_profile(str(username)))
 
@@ -87,7 +87,7 @@ class _Server:
         self._plugin = plugin
     def request(self, type, action, payload=None, timeout_ms=60000):
         import json
-        return self._plugin._bridge.server_request(str(type), str(action), json.dumps(payload or {}), int(timeout_ms))
+        return json.loads(self._plugin._bridge.server_request(str(type), str(action), json.dumps(payload or {}), int(timeout_ms)))
     def on(self, event, callback):
         return self._plugin.hook(event, callback)
 
@@ -103,27 +103,15 @@ class BasePlugin:
         self.profiles = _Profiles(self)
         self.server = _Server(self)
 
-    @staticmethod
-    def _to_python(value):
-        if value is None or isinstance(value, (str, int, float, bool)):
-            return value
-        try:
-            entries = value.entrySet()
-            return {str(entry.getKey()): BasePlugin._to_python(entry.getValue()) for entry in entries}
-        except Exception:
-            pass
-        try:
-            return [BasePlugin._to_python(item) for item in value]
-        except Exception:
-            return value
-
     @property
     def user(self):
-        return self._to_python(self._bridge.current_user())
+        import json
+        return json.loads(self._bridge.current_user_json())
 
     @property
     def app(self):
-        return self._to_python(self._bridge.app_info())
+        import json
+        return json.loads(self._bridge.app_info_json())
 
     @property
     def connection_state(self):
