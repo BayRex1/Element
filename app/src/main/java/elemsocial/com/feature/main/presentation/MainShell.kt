@@ -804,9 +804,6 @@ fun MainShell(
                                 onOpenProfile = { username ->
                                     openProfile(username)
                                 },
-                                currentDisplayName = accountName,
-                                currentUsername = accountUsername,
-                                currentAvatar = accountAvatar,
                                 topPadding = ShellContentTopPadding,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -942,6 +939,9 @@ fun MainShell(
                                 onOpenProfile = { username ->
                                     openProfile(username)
                                 },
+                                 currentDisplayName = accountName,
+                                 currentUsername = accountUsername,
+                                 currentAvatar = accountAvatar,
                                 topPadding = ShellContentTopPadding,
                                 bottomPadding = ShellContentBottomPadding,
                                 modifier = Modifier.fillMaxSize()
