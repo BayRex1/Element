@@ -7,11 +7,15 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.widget.Toast
+import com.chaquo.python.PyObject
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 import dalvik.system.DexClassLoader
 import elemsocial.com.core.ws.ElementSocketClient
 import elemsocial.com.ui.pack.theme.ElementUiPalette
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -19,7 +23,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-const val ELEMENT_PLUGIN_API_VERSION = 2
+const val ELEMENT_PLUGIN_API_VERSION = 3
+const val ELEMENT_PLUGIN_SCRIPT_API_VERSION = 1
 
 data class ElementPlugin(
     val id: String,
@@ -147,6 +152,8 @@ class ElementPluginStorage internal constructor(private val preferences: android
 object ElementPluginRuntime {
     private data class Loaded(val plugin: ElementPlugin, val entry: ElementPluginEntry)
     private val loaded = CopyOnWriteArrayList<Loaded>()
+    private val pythonLoaded = CopyOnWriteArrayList<Pair<ElementPlugin, PyObject>>()
+    private val pythonHooks = ConcurrentHashMap<String, CopyOnWriteArrayList<PyObject>>()
     private val registrations = CopyOnWriteArrayList<ElementPluginNavItem>()
     private val _bottomNavigation = MutableStateFlow<List<ElementPluginNavItem>>(emptyList())
     val bottomNavigation: StateFlow<List<ElementPluginNavItem>> = _bottomNavigation.asStateFlow()
@@ -183,6 +190,7 @@ object ElementPluginRuntime {
             pi.versionName.orEmpty(),
             if (android.os.Build.VERSION.SDK_INT >= 28) pi.longVersionCode else pi.versionCode.toLong()
         )
+        if (!Python.isStarted()) Python.start(AndroidPlatform(app))
         ElementPluginStore(app).loadAll().forEach { loadPlugin(app, it) }
         publish()
     }
