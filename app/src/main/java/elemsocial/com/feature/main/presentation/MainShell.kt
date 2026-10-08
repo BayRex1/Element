@@ -318,7 +318,8 @@ fun MainShell(
                 currentTab = MainTab.Home
                 openedProfileUsername = null
                 requestedProfilePostId = null
-                clearSearch()
+                searchQuery = ""
+                isSearchFocused = false
                 requestedPostId = postId
                 true
             },
@@ -328,7 +329,8 @@ fun MainShell(
                     false
                 } else {
                     openedProfileUsername = normalized
-                    clearSearch()
+                    searchQuery = ""
+                    isSearchFocused = false
                     requestedPostId = null
                     requestedProfilePostId = null
                     true
