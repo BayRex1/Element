@@ -442,7 +442,7 @@ fun MainShell(
     val navItems = navTabs.map {
         ElementBottomNavItem(
             title = it.title,
-            iconRes = it.iconRes,
+            iconRes = it.iconRes ?: 0,
             iconText = it.iconText,
             iconBase64 = it.iconBase64,
             badgeCount = if (it.mainTab == MainTab.Notifications) notificationsCount else null
