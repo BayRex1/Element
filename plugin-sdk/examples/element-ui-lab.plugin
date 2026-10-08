@@ -1,0 +1,117 @@
+from element_plugin import BasePlugin
+
+__id__ = "element_ui_lab"
+__name__ = "Element UI Lab"
+__description__ = "Демонстрация Python Plugin API v4 и встроенного UI"
+__version__ = "4.0.0"
+__author__ = "Element"
+__icon__ = "post/144376"
+
+
+class Plugin(BasePlugin):
+    def on_plugin_load(self):
+        self.ui.bottom_button(
+            id="ui_lab",
+            title="UI Lab",
+            icon="🧩",
+            on_click=self.open_lab,
+        )
+        self.hook("post.opened", self.on_post_opened)
+        self.toast("Element UI Lab v4 загружен")
+
+    def open_lab(self):
+        self.ui.screen(
+            id="main",
+            title="Element UI Lab",
+            content=[
+                self.ui.title("Plugin UI API v4"),
+                self.ui.text(
+                    "Полноценный интерфейс плагина внутри Element. "
+                    "Ниже можно проверить основные компоненты и callbacks."
+                ),
+
+                self.ui.card(
+                    title="Кнопки",
+                    text="Обычная и мягкая кнопка.",
+                    children=[
+                        self.ui.button(
+                            "Нажать",
+                            on_click=self.on_button,
+                        ),
+                        self.ui.soft_button(
+                            "Мягкая кнопка",
+                            on_click=self.on_soft_button,
+                        ),
+                    ],
+                ),
+
+                self.ui.card(
+                    title="Переключатели",
+                    text="Изменения значения приходят обратно в Python.",
+                    children=[
+                        self.ui.switch(
+                            "Тестовый режим",
+                            value=True,
+                            on_change=self.on_switch,
+                        ),
+                        self.ui.checkbox(
+                            "Я согласен",
+                            value=False,
+                            on_change=self.on_checkbox,
+                        ),
+                    ],
+                ),
+
+                self.ui.card(
+                    title="Ввод текста",
+                    text="Callback вызывается при изменении значения.",
+                    children=[
+                        self.ui.input(
+                            "Имя",
+                            value="Element",
+                            placeholder="Введите имя",
+                            on_change=self.on_input,
+                        ),
+                    ],
+                ),
+
+                self.ui.divider(),
+                self.ui.text(
+                    "Открытие поста, профиля и другие возможности "
+                    "остаются доступны через основной Plugin API."
+                ),
+                self.ui.button(
+                    "Закрыть экран",
+                    on_click=self.close_lab,
+                ),
+            ],
+        )
+
+    def on_button(self, event):
+        self.toast("Кнопка нажата")
+
+    def on_soft_button(self, event):
+        self.toast("Soft button нажата")
+
+    def on_switch(self, event):
+        value = event.get("value", False)
+        self.toast("Тестовый режим: %s" % ("вкл" if value else "выкл"))
+
+    def on_checkbox(self, event):
+        value = event.get("value", False)
+        self.toast("Checkbox: %s" % ("да" if value else "нет"))
+
+    def on_input(self, event):
+        value = event.get("value", "")
+        self.storage.set("last_name", value)
+
+    def close_lab(self, event):
+        self.ui.close()
+
+    def on_post_opened(self, event):
+        post_id = event.get("post_id")
+        if post_id:
+            self.toast("Открыт пост #%s" % post_id)
+
+    def on_plugin_unload(self):
+        self.ui.close()
