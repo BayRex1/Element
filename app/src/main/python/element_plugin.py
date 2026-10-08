@@ -32,16 +32,78 @@ class _Theme:
 class _UI:
     def __init__(self, plugin):
         self._plugin = plugin
+        self._counter = 0
+
     def toast(self, message, long=False):
         self._plugin._bridge.show_toast(str(message), bool(long))
+
     def open_post(self, post_id):
         return bool(self._plugin._bridge.open_post(int(post_id)))
+
     def open_profile(self, username):
         return bool(self._plugin._bridge.open_profile(str(username)))
+
     def open_url(self, url):
         return bool(self._plugin._bridge.open_url(str(url)))
+
     def bottom_button(self, id, title, icon="🧩", on_click=None, badge=None):
         return self._plugin.add_bottom_button(id, title, icon, on_click, badge)
+
+    def _callback(self, callback):
+        if callback is None:
+            return None
+        self._counter += 1
+        callback_id = "ui_%s" % self._counter
+        self._plugin._bridge.register_ui_callback(callback_id, callback)
+        return callback_id
+
+    def text(self, text, secondary="", size=None, bold=False):
+        return {"type": "title" if bold else "text", "text": str(text), "secondary": str(secondary)}
+
+    def title(self, text):
+        return {"type": "title", "text": str(text)}
+
+    def button(self, text, on_click=None, enabled=True):
+        return {"type": "button", "text": str(text), "enabled": bool(enabled), "callback_id": self._callback(on_click)}
+
+    def soft_button(self, text, on_click=None, enabled=True):
+        return {"type": "soft_button", "text": str(text), "enabled": bool(enabled), "callback_id": self._callback(on_click)}
+
+    def switch(self, text, value=False, on_change=None, secondary=""):
+        return {"type": "switch", "text": str(text), "secondary": str(secondary), "checked": bool(value), "callback_id": self._callback(on_change)}
+
+    def checkbox(self, text, value=False, on_change=None):
+        return {"type": "checkbox", "text": str(text), "checked": bool(value), "callback_id": self._callback(on_change)}
+
+    def input(self, label, value="", placeholder="", on_change=None):
+        return {"type": "input", "text": str(label), "value": str(value), "secondary": str(placeholder), "callback_id": self._callback(on_change)}
+
+    def divider(self):
+        return {"type": "divider"}
+
+    def spacer(self, height=12):
+        return {"type": "spacer", "value": str(height)}
+
+    def card(self, title="", text="", children=None):
+        return {"type": "card", "text": str(title), "secondary": str(text), "children": list(children or [])}
+
+    def column(self, children):
+        return {"type": "column", "children": list(children or [])}
+
+    def row(self, children):
+        return {"type": "row", "children": list(children or [])}
+
+    def screen(self, id, title, content):
+        import json
+        payload = {
+            "id": str(id),
+            "title": str(title),
+            "nodes": list(content or []),
+        }
+        self._plugin._bridge.show_ui_screen_json(json.dumps(payload, ensure_ascii=False))
+
+    def close(self):
+        self._plugin._bridge.close_ui_screen()
 
 
 class _Posts:
