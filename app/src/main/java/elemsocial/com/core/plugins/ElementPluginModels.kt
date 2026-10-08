@@ -253,7 +253,7 @@ object ElementPluginRuntime {
         }
     }
 
-    private inner class PythonPluginBridge(
+    private class PythonPluginBridge(
         private val context: Context,
         private val plugin: ElementPlugin
     ) {
