@@ -321,8 +321,10 @@ object ElementPluginRuntime {
             pythonHooks.getOrPut(event) { CopyOnWriteArrayList() }.add(callback)
         }
         fun unregister_hook(event: String, callback: PyObject) { pythonHooks[event]?.removeAll { it === callback } }
-        fun register_ui_callback(callbackId: String, callback: PyObject) {
-            pythonUiCallbacks[plugin.id + ":" + callbackId] = callback
+        fun register_ui_callback(callbackId: String, callback: PyObject): String {
+            val key = plugin.id + ":" + callbackId
+            pythonUiCallbacks[key] = callback
+            return key
         }
         fun show_ui_screen_json(json: String) {
             val root = runCatching { JSONObject(json) }.getOrNull() ?: return
