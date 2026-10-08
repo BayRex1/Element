@@ -303,11 +303,56 @@ fun MainShell(
     val context = LocalContext.current
     val pluginNavItems by ElementPluginRuntime.bottomNavigation.collectAsState()
 
-    DisposableEffect(context) {
-        ElementPluginRuntime.attach(context) {
-            pluginManagerOpen = true
-        }
+    DisposableEffect(context, socketClient) {
+        ElementPluginRuntime.attach(
+            context = context,
+            onOpenPluginManager = { pluginManagerOpen = true },
+            socketClient = socketClient,
+            user = elemsocial.com.core.plugins.ElementPluginUser(
+                id = accountId,
+                name = accountName,
+                username = accountUsername,
+                email = accountEmail
+            ),
+            onOpenPost = { postId ->
+                currentTab = MainTab.Home
+                openedProfileUsername = null
+                requestedProfilePostId = null
+                clearSearch()
+                requestedPostId = postId
+                true
+            },
+            onOpenProfile = { username ->
+                val normalized = normalizeProfileUsername(username)
+                if (normalized == null) {
+                    false
+                } else {
+                    openedProfileUsername = normalized
+                    clearSearch()
+                    requestedPostId = null
+                    requestedProfilePostId = null
+                    true
+                }
+            }
+        )
         onDispose { ElementPluginRuntime.detach() }
+    }
+
+    LaunchedEffect(accountId, accountName, accountUsername, accountEmail) {
+        ElementPluginRuntime.setUser(
+            elemsocial.com.core.plugins.ElementPluginUser(
+                id = accountId,
+                name = accountName,
+                username = accountUsername,
+                email = accountEmail
+            )
+        )
+    }
+
+    LaunchedEffect(socketClient) {
+        socketClient.events.collect { event ->
+            ElementPluginRuntime.emitServerEvent(event)
+        }
     }
 
     val focusManager = LocalFocusManager.current
@@ -442,7 +487,7 @@ fun MainShell(
     val navItems = navTabs.map {
         ElementBottomNavItem(
             title = it.title,
-            iconRes = it.iconRes ?: 0,
+            iconRes = it.iconRes,
             iconText = it.iconText,
             iconBase64 = it.iconBase64,
             badgeCount = if (it.mainTab == MainTab.Notifications) notificationsCount else null
