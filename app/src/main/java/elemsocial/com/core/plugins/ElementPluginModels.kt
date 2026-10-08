@@ -157,6 +157,9 @@ object ElementPluginRuntime {
     private val loaded = CopyOnWriteArrayList<Loaded>()
     private val pythonLoaded = CopyOnWriteArrayList<Pair<ElementPlugin, PyObject>>()
     private val pythonHooks = ConcurrentHashMap<String, CopyOnWriteArrayList<PyObject>>()
+    private val pythonUiCallbacks = ConcurrentHashMap<String, PyObject>()
+    private val _uiScreen = MutableStateFlow<ElementPluginUiScreen?>(null)
+    val uiScreen: StateFlow<ElementPluginUiScreen?> = _uiScreen.asStateFlow()
     private val registrations = CopyOnWriteArrayList<ElementPluginNavItem>()
     private val _bottomNavigation = MutableStateFlow<List<ElementPluginNavItem>>(emptyList())
     val bottomNavigation: StateFlow<List<ElementPluginNavItem>> = _bottomNavigation.asStateFlow()
@@ -215,6 +218,20 @@ object ElementPluginRuntime {
     }
 
     fun setUser(user: ElementPluginUser) { currentUserValue = user }
+    fun closeUiScreen() { _uiScreen.value = null }
+    fun invokeUiCallback(callbackId: String, payloadJson: String = "{}") {
+        pythonUiCallbacks[callbackId]?.let { callback ->
+            runCatching {
+                callback.call(Python.getInstance().getModule("json").callAttr("loads", payloadJson))
+            }.onFailure {
+                appContext?.let { ctx ->
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(ctx, "Plugin UI error: " + (it.message ?: "error"), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
     fun emitServerEvent(event: Map<String, Any?>) {
         _serverEvents.tryEmit(event)
         dispatchPythonHook("server.event", event)
@@ -304,6 +321,16 @@ object ElementPluginRuntime {
             pythonHooks.getOrPut(event) { CopyOnWriteArrayList() }.add(callback)
         }
         fun unregister_hook(event: String, callback: PyObject) { pythonHooks[event]?.removeAll { it === callback } }
+        fun register_ui_callback(callbackId: String, callback: PyObject) {
+            pythonUiCallbacks[plugin.id + ":" + callbackId] = callback
+        }
+        fun show_ui_screen_json(json: String) {
+            val root = runCatching { JSONObject(json) }.getOrNull() ?: return
+            _uiScreen.value = parseUiScreen(plugin.id, root)
+        }
+        fun close_ui_screen() {
+            if (_uiScreen.value?.pluginId == plugin.id) _uiScreen.value = null
+        }
         fun set_theme_json(json: String) {
             val overrides = runCatching { JSONObject(json) }.getOrNull() ?: return
             fun color(key: String): Int? {
@@ -357,6 +384,37 @@ object ElementPluginRuntime {
                 }
             }
         }
+    }
+
+    private fun parseUiScreen(pluginId: String, root: JSONObject): ElementPluginUiScreen {
+        fun node(value: JSONObject): ElementPluginUiNode {
+            val children = mutableListOf<ElementPluginUiNode>()
+            value.optJSONArray("children")?.let { array ->
+                for (i in 0 until array.length()) {
+                    array.optJSONObject(i)?.let { children += node(it) }
+                }
+            }
+            return ElementPluginUiNode(
+                type = value.optString("type", "text"),
+                text = value.optString("text", ""),
+                secondary = value.optString("secondary", ""),
+                callbackId = value.optString("callback_id").takeIf { it.isNotBlank() },
+                value = value.optString("value", ""),
+                checked = value.optBoolean("checked", false),
+                enabled = value.optBoolean("enabled", true),
+                children = children
+            )
+        }
+        val nodes = mutableListOf<ElementPluginUiNode>()
+        root.optJSONArray("nodes")?.let { array ->
+            for (i in 0 until array.length()) array.optJSONObject(i)?.let { nodes += node(it) }
+        }
+        return ElementPluginUiScreen(
+            pluginId = pluginId,
+            screenId = root.optString("id", "screen"),
+            title = root.optString("title", pluginId),
+            nodes = nodes
+        )
     }
 
     private fun dispatchPythonHook(event: String, payload: Map<String, Any?>) {
@@ -449,6 +507,8 @@ object ElementPluginRuntime {
         }
         pythonLoaded.clear()
         pythonHooks.clear()
+        pythonUiCallbacks.clear()
+        _uiScreen.value = null
         registrations.clear()
         ElementUiPalette.clearPluginOverrides()
         publish()
