@@ -37,10 +37,28 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleDebug
+        run: ./gradlew clean assembleDebug --no-build-cache
+
+      - name: Package source archive
+        run: |
+          git archive --format=zip --output=element-source-plugin-api-v2.zip HEAD
+          cd plugin-sdk
+          zip -r ../element-plugin-sdk-v2.zip . >/dev/null
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: element-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: element-source-plugin-api-v2
+          path: element-source-plugin-api-v2.zip
+
+      - name: Upload plugin SDK
+        uses: actions/upload-artifact@v4
+        with:
+          name: element-plugin-sdk-v2
+          path: element-plugin-sdk-v2.zip
