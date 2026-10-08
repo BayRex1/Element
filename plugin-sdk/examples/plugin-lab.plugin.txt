@@ -19,7 +19,6 @@ class Plugin(BasePlugin):
         )
         self.hook("post.opened", self.on_post_opened)
         self.hook("server.event", self.on_server_event)
-        self.theme.set(accent="#FF6D00")
         self.storage.set("loaded", "1")
 
     def open_lab(self):
