@@ -74,7 +74,10 @@ class _Profiles:
     def __init__(self, plugin):
         self._plugin = plugin
     def get(self, username):
-        return self._plugin._bridge.server_request("social", "profile/load", {"username": str(username)})
+        import json
+        return self._plugin._bridge.server_request(
+            "social", "profile/load", json.dumps({"username": str(username)}), 60000
+        )
     def open(self, username):
         return bool(self._plugin._bridge.open_profile(str(username)))
 
@@ -100,13 +103,27 @@ class BasePlugin:
         self.profiles = _Profiles(self)
         self.server = _Server(self)
 
+    @staticmethod
+    def _to_python(value):
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        try:
+            entries = value.entrySet()
+            return {str(entry.getKey()): BasePlugin._to_python(entry.getValue()) for entry in entries}
+        except Exception:
+            pass
+        try:
+            return [BasePlugin._to_python(item) for item in value]
+        except Exception:
+            return value
+
     @property
     def user(self):
-        return self._bridge.current_user()
+        return self._to_python(self._bridge.current_user())
 
     @property
     def app(self):
-        return self._bridge.app_info()
+        return self._to_python(self._bridge.app_info())
 
     @property
     def connection_state(self):
