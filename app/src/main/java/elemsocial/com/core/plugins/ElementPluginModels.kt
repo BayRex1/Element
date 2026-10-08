@@ -167,7 +167,8 @@ object ElementPluginRuntime {
     @Volatile private var profileOpener: ((String) -> Boolean)? = null
     @Volatile private var socket: ElementSocketClient? = null
     @Volatile private var currentUserValue = ElementPluginUser(null, null, null, null)
-    @Volatile private var appInfoValue = ElementPluginAppInfo(2, "", "", 0)
+    @Volatile private var appInfoValue = ElementPluginAppInfo(ELEMENT_PLUGIN_API_VERSION, "", "", 0)
+    @Volatile private var appContext: Context? = null
 
     @Synchronized
     fun attach(
