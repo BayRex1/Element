@@ -140,6 +140,8 @@ import elemsocial.com.feature.profile.presentation.ProfileScreen
 import elemsocial.com.feature.search.presentation.SearchGateway
 import elemsocial.com.feature.search.presentation.SearchOverlay
 import elemsocial.com.feature.settings.presentation.SettingsScreen
+import elemsocial.com.feature.settings.presentation.ElementumPluginsScreen
+import elemsocial.com.core.plugins.ElementPluginRuntime
 import elemsocial.com.feature.wallet.presentation.WalletGateway
 import elemsocial.com.feature.wallet.presentation.WalletScreen
 import elemsocial.com.ui.pack.UIKit
@@ -148,6 +150,16 @@ import elemsocial.com.ui.pack.theme.ElementUiPalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
+
+private data class ShellNavEntry(
+    val id: String,
+    val title: String,
+    val iconRes: Int? = null,
+    val iconText: String? = null,
+    val iconBase64: String? = null,
+    val pluginAction: (() -> Unit)? = null,
+    val mainTab: MainTab? = null
+)
 
 private enum class MainTab(
     val title: String,
@@ -263,6 +275,7 @@ fun MainShell(
     var selectedComposerChannelId by remember { mutableStateOf<Int?>(null) }
     var editingChannel by remember { mutableStateOf<AuthAccountChannel?>(null) }
     var elementumSettingsOpen by remember { mutableStateOf(false) }
+    var pluginManagerOpen by remember { mutableStateOf(false) }
     var channelOverrides by remember { mutableStateOf<Map<Int, AuthAccountChannel>>(emptyMap()) }
     var refreshCounters by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var refreshingRouteId by remember { mutableStateOf<String?>(null) }
@@ -288,6 +301,15 @@ fun MainShell(
     val activeProfileUsername = openedProfileUsername
         ?: ownProfileUsername?.takeIf { currentTab == MainTab.Profile }
     val context = LocalContext.current
+    val pluginNavItems by ElementPluginRuntime.bottomNavigation.collectAsState()
+
+    DisposableEffect(context) {
+        ElementPluginRuntime.attach(context) {
+            pluginManagerOpen = true
+        }
+        onDispose { ElementPluginRuntime.detach() }
+    }
+
     val focusManager = LocalFocusManager.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val musicController = LocalMusicController.current
@@ -400,18 +422,30 @@ fun MainShell(
     }
 
     val navTabs = buildList {
-        add(MainTab.Home)
-        add(MainTab.Notifications)
-        add(MainTab.Messenger)
-        add(MainTab.Music)
-        // TODO(next-release): вернуть MainTab.Panel в нижнюю панель после релиза админ-экрана.
-        // if (isAdmin) add(MainTab.Panel)
+        add(ShellNavEntry("home", MainTab.Home.title, MainTab.Home.iconRes, mainTab = MainTab.Home))
+        add(ShellNavEntry("notifications", MainTab.Notifications.title, MainTab.Notifications.iconRes, mainTab = MainTab.Notifications))
+        add(ShellNavEntry("messenger", MainTab.Messenger.title, MainTab.Messenger.iconRes, mainTab = MainTab.Messenger))
+        add(ShellNavEntry("music", MainTab.Music.title, MainTab.Music.iconRes, mainTab = MainTab.Music))
+        pluginNavItems.forEach { plugin ->
+            add(
+                ShellNavEntry(
+                    id = "plugin:${plugin.pluginId}:${plugin.itemId}",
+                    title = plugin.title,
+                    iconText = plugin.icon,
+                    iconBase64 = plugin.iconBase64,
+                    pluginAction = plugin.action
+                )
+            )
+        }
     }
+
     val navItems = navTabs.map {
         ElementBottomNavItem(
             title = it.title,
             iconRes = it.iconRes,
-            badgeCount = if (it == MainTab.Notifications) notificationsCount else null
+            iconText = it.iconText,
+            iconBase64 = it.iconBase64,
+            badgeCount = if (it.mainTab == MainTab.Notifications) notificationsCount else null
         )
     }
     val homeRouteId = routeIdForTab(MainTab.Home)
@@ -426,11 +460,11 @@ fun MainShell(
     val activeRouteId = currentRouteId()
     val selectedBottomTab = when {
         activeProfileUsername != null -> MainTab.Profile
-        navTabs.contains(currentTab) -> currentTab
+        navTabs.any { it.mainTab == currentTab } -> currentTab
         else -> null
     }
     val selectedBottomIndex = selectedBottomTab
-        ?.let { navTabs.indexOf(it) }
+        ?.let { tab -> navTabs.indexOfFirst { it.mainTab == tab } }
         ?.takeIf { it >= 0 }
         ?: -1
 
@@ -912,6 +946,7 @@ fun MainShell(
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
+
                     }
 
                     if (hallTabVisible) {
@@ -1005,7 +1040,13 @@ fun MainShell(
             selectedIndex = selectedBottomIndex,
             onSelect = { index ->
                 editingChannel = null
-                val selectedTab = navTabs[index]
+                val selectedEntry = navTabs[index]
+                val selectedTab = selectedEntry.mainTab
+                if (selectedEntry.pluginAction != null) {
+                    selectedEntry.pluginAction.invoke()
+                    return@BottomNav
+                }
+                if (selectedTab == null) return@BottomNav
                 val selectedOwnProfile = !ownProfileUsername.isNullOrBlank() &&
                     activeProfileUsername.equals(ownProfileUsername, ignoreCase = true)
                 val shouldRefreshCurrentTab = selectedTab == selectedBottomTab &&
@@ -1217,6 +1258,21 @@ fun MainShell(
 
         // ⬇️⬇️⬇️ ВСТАВЬ ЭТОТ БЛОК ЗДЕСЬ ⬇️⬇️⬇️
         // (перед закрывающей скобкой Box, но после AnimatedVisibility)
+        if (pluginManagerOpen) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { pluginManagerOpen = false },
+                properties = androidx.compose.ui.window.DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false
+                )
+            ) {
+                ElementumPluginsScreen(
+                    onClose = { pluginManagerOpen = false },
+                    homeGateway = homeGateway
+                )
+            }
+        }
+
         if (elementumSettingsOpen) {
             androidx.compose.ui.window.Dialog(
                 onDismissRequest = { elementumSettingsOpen = false },
