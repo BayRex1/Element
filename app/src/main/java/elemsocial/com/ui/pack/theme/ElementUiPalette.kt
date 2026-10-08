@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import elemsocial.com.core.settings.AppThemeMode
+import elemsocial.com.core.plugins.ElementPluginThemeOverrides
 
 private data class ElementPalette(
     val body: Color,
@@ -72,15 +73,18 @@ private val AmoledPalette = ElementPalette(
 
 object ElementUiPalette {
     private var activePalette by mutableStateOf(LightPalette)
+    private var pluginOverrides by mutableStateOf<ElementPluginThemeOverrides?>(null)
+
+    private fun pluginColor(value: Int?): Color? = value?.let(::Color)
 
     val Body: Color
-        get() = activePalette.body
+        get() = pluginColor(pluginOverrides?.bodyArgb) ?: activePalette.body
 
     val Block: Color
-        get() = activePalette.block
+        get() = pluginColor(pluginOverrides?.blockArgb) ?: activePalette.block
 
     val BlockSoft: Color
-        get() = activePalette.blockSoft
+        get() = pluginColor(pluginOverrides?.blockSoftArgb) ?: activePalette.blockSoft
 
     val Interaction: Color
         get() = activePalette.interaction
@@ -89,13 +93,13 @@ object ElementUiPalette {
         get() = activePalette.interactionText
 
     val Accent: Color
-        get() = activePalette.accent
+        get() = pluginColor(pluginOverrides?.accentArgb) ?: activePalette.accent
 
     val TextPrimary: Color
-        get() = activePalette.textPrimary
+        get() = pluginColor(pluginOverrides?.textPrimaryArgb) ?: activePalette.textPrimary
 
     val TextSecondary: Color
-        get() = activePalette.textSecondary
+        get() = pluginColor(pluginOverrides?.textSecondaryArgb) ?: activePalette.textSecondary
 
     val TextLite: Color
         get() = activePalette.textLite
@@ -110,13 +114,13 @@ object ElementUiPalette {
     }
 
     val Error: Color
-        get() = activePalette.error
+        get() = pluginColor(pluginOverrides?.errorArgb) ?: activePalette.error
 
     val Success: Color
-        get() = activePalette.success
+        get() = pluginColor(pluginOverrides?.successArgb) ?: activePalette.success
 
     val Info: Color
-        get() = activePalette.info
+        get() = pluginColor(pluginOverrides?.infoArgb) ?: activePalette.info
 
     fun applyTheme(mode: AppThemeMode) {
         activePalette = when (mode) {
@@ -125,5 +129,13 @@ object ElementUiPalette {
             AppThemeMode.Light,
             AppThemeMode.System -> LightPalette
         }
+    }
+
+    fun applyPluginOverrides(overrides: ElementPluginThemeOverrides) {
+        pluginOverrides = overrides
+    }
+
+    fun clearPluginOverrides() {
+        pluginOverrides = null
     }
 }
