@@ -1,0 +1,10 @@
+{
+  "id": "example-v2",
+  "name": "Element Plugin API v2 Example",
+  "description": "Example native plugin showing UI, theme and server APIs.",
+  "version": "2.0.0",
+  "author": "Element",
+  "icon": "🧩",
+  "entry_class": "example.element.plugin.ExamplePlugin",
+  "code_dex_base64": "<PUT_COMPILED_PLUGIN_DEX_BASE64_HERE>"
+}
