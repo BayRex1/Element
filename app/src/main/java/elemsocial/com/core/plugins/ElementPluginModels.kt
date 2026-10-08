@@ -242,6 +242,7 @@ object ElementPluginRuntime {
         runCatching {
             val file = File(context.filesDir, "plugins/" + plugin.fileName)
             require(file.isFile) { "Файл плагина не найден" }
+            if (file.readText(Charsets.UTF_8).trimStart().startsWith("{")) return@runCatching
             val bridge = PythonPluginBridge(context, plugin)
             val instance = Python.getInstance().getModule("element_plugin_runtime")
                 .callAttr("load_plugin", file.absolutePath, bridge)
