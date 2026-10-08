@@ -54,8 +54,7 @@ class _UI:
             return None
         self._counter += 1
         callback_id = "ui_%s" % self._counter
-        self._plugin._bridge.register_ui_callback(callback_id, callback)
-        return callback_id
+        return self._plugin._bridge.register_ui_callback(callback_id, callback)
 
     def text(self, text, secondary="", size=None, bold=False):
         return {"type": "title" if bold else "text", "text": str(text), "secondary": str(secondary)}
