@@ -209,7 +209,12 @@ object ElementPluginRuntime {
     }
 
     fun setUser(user: ElementPluginUser) { currentUserValue = user }
-    fun emitServerEvent(event: Map<String, Any?>) { _serverEvents.tryEmit(event) }
+    fun emitServerEvent(event: Map<String, Any?>) {
+        _serverEvents.tryEmit(event)
+        dispatchPythonHook("server.event", event)
+        event["type"]?.toString()?.takeIf { it.isNotBlank() }?.let { dispatchPythonHook(it, event) }
+        event["action"]?.toString()?.takeIf { it.isNotBlank() }?.let { dispatchPythonHook(it, event) }
+    }
 
     private fun loadPlugin(context: Context, plugin: ElementPlugin) {
         val className = plugin.entryClass?.trim().orEmpty()
@@ -346,8 +351,16 @@ object ElementPluginRuntime {
                 publish()
             }
             override fun openPluginManager() { manager?.invoke() }
-            override fun openPost(postId: Int): Boolean = postOpener?.invoke(postId) == true
-            override fun openProfile(username: String): Boolean = profileOpener?.invoke(username) == true
+            override fun openPost(postId: Int): Boolean {
+                val result = postOpener?.invoke(postId) == true
+                if (result) dispatchPythonHook("post.opened", mapOf("post_id" to postId))
+                return result
+            }
+            override fun openProfile(username: String): Boolean {
+                val result = profileOpener?.invoke(username) == true
+                if (result) dispatchPythonHook("profile.opened", mapOf("username" to username))
+                return result
+            }
             override fun showToast(message: String, long: Boolean) {
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(context.applicationContext, message, if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
@@ -399,6 +412,13 @@ object ElementPluginRuntime {
     private fun unloadAll() {
         loaded.forEach { runCatching { it.entry.onUnload() } }
         loaded.clear()
+        pythonLoaded.forEach { (_, instance) ->
+            runCatching {
+                Python.getInstance().getModule("element_plugin_runtime").callAttr("unload_plugin", instance)
+            }
+        }
+        pythonLoaded.clear()
+        pythonHooks.clear()
         registrations.clear()
         ElementUiPalette.clearPluginOverrides()
         publish()
