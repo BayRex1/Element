@@ -142,6 +142,7 @@ import elemsocial.com.feature.search.presentation.SearchOverlay
 import elemsocial.com.feature.settings.presentation.SettingsScreen
 import elemsocial.com.feature.settings.presentation.ElementumPluginsScreen
 import elemsocial.com.core.plugins.ElementPluginRuntime
+import elemsocial.com.core.plugins.ElementPluginScreen
 import elemsocial.com.feature.wallet.presentation.WalletGateway
 import elemsocial.com.feature.wallet.presentation.WalletScreen
 import elemsocial.com.ui.pack.UIKit
@@ -302,6 +303,7 @@ fun MainShell(
         ?: ownProfileUsername?.takeIf { currentTab == MainTab.Profile }
     val context = LocalContext.current
     val pluginNavItems by ElementPluginRuntime.bottomNavigation.collectAsState()
+    val pluginUiScreen by ElementPluginRuntime.uiScreen.collectAsState()
 
     DisposableEffect(context, socketClient) {
         ElementPluginRuntime.attach(
@@ -530,7 +532,8 @@ fun MainShell(
         }
     }
 
-    val shouldHandleBackPress = isSidebarOpen ||
+    val shouldHandleBackPress = pluginUiScreen != null ||
+        isSidebarOpen ||
         isHeaderMusicPlayerOpen ||
         isDownloadsOpen ||
         editingChannel != null ||
@@ -541,6 +544,10 @@ fun MainShell(
 
     BackHandler(enabled = shouldHandleBackPress) {
         when {
+            pluginUiScreen != null -> {
+                ElementPluginRuntime.closeUiScreen()
+            }
+
             editingChannel != null -> {
                 editingChannel = null
             }
@@ -1082,7 +1089,7 @@ fun MainShell(
             )
         }
 
-        UIKit.BottomNav(
+        if (pluginUiScreen == null) UIKit.BottomNav(
             items = navItems,
             selectedIndex = selectedBottomIndex,
             onSelect = { index ->
@@ -1118,6 +1125,19 @@ fun MainShell(
             modifier = Modifier.align(Alignment.BottomCenter),
             showShadow = currentTab != MainTab.Settings
         )
+
+        pluginUiScreen?.let { screen ->
+            ElementPluginScreen(
+                screen = screen,
+                onBack = { ElementPluginRuntime.closeUiScreen() },
+                onAction = { callbackId, payloadJson ->
+                    ElementPluginRuntime.invokeUiCallback(callbackId, payloadJson)
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = ShellContentTopPadding)
+            )
+        }
 
         if (currentTab == MainTab.Music && false) {
             MusicMiniPlayerBar(
