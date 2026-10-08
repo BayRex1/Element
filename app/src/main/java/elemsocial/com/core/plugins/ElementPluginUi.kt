@@ -1,5 +1,6 @@
 package elemsocial.com.core.plugins
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,7 +57,7 @@ fun ElementPluginScreen(
     onAction: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.padding(horizontal = 10.dp)) {
+    Column(modifier = modifier.background(ElementUiPalette.Body).padding(horizontal = 10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
