@@ -27,8 +27,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-const val ELEMENT_PLUGIN_API_VERSION = 3
-const val ELEMENT_PLUGIN_SCRIPT_API_VERSION = 1
+const val ELEMENT_PLUGIN_API_VERSION = 4
+const val ELEMENT_PLUGIN_SCRIPT_API_VERSION = 4
 
 data class ElementPlugin(
     val id: String,
