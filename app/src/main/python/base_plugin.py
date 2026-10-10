@@ -1,8 +1,8 @@
 """NimarkoGram/exteraGram Python plugin API compatibility for Element.
 
 The high-level plugin lifecycle, storage and event API are adapted to Element.
-Xposed/Pine method hooks are intentionally not emulated: Element does not yet
-ship a Java method-hook backend, so hook_method() reports that limitation.
+Java method hooks are backed by Element's in-process Pine adapter on supported arm64
+Android versions. Xposed resource hooks and unrelated Telegram internals are not included.
 """
 from dataclasses import dataclass
 from enum import Enum
