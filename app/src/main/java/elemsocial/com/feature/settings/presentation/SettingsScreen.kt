@@ -1352,10 +1352,11 @@ fun SettingsScreen(
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             SettingsPartitionTitle("Смена темы")
             UIKit.SegmentTabs(
-                tabs = listOf("Светлая", "Темная", "AMOLED"),
+                tabs = listOf("Светлая", "Темная", "AMOLED", "🎃 Halloween"),
                 selectedIndex = when (themeMode) {
                     AppThemeMode.Dark -> 1
                     AppThemeMode.Amoled -> 2
+                    AppThemeMode.Halloween -> 3
                     AppThemeMode.System,
                     AppThemeMode.Light -> 0
                 },
@@ -1364,6 +1365,7 @@ fun SettingsScreen(
                         when (index) {
                             1 -> AppThemeMode.Dark
                             2 -> AppThemeMode.Amoled
+                            3 -> AppThemeMode.Halloween
                             else -> AppThemeMode.Light
                         }
                     )
