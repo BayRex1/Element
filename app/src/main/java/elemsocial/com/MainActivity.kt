@@ -39,6 +39,8 @@ import elemsocial.com.config.AppConfig
 import elemsocial.com.core.cache.ImageDiskCache
 import elemsocial.com.core.cache.MusicCacheIndexStore
 import elemsocial.com.core.model.TransparencyMode
+import elemsocial.com.core.plugins.ElementPluginEvent
+import elemsocial.com.core.plugins.ElementPluginManager
 import elemsocial.com.core.notifications.ElementNotificationManager
 import elemsocial.com.core.session.AccountSessionsStore
 import elemsocial.com.core.session.SessionStore
@@ -124,11 +126,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
             val socketClient = remember { ElementSocketClient() }
+            val pluginManager = remember(context) { ElementPluginManager(context) }
             val authRepository = remember { AuthRepositoryImpl(socketClient) }
             val authGateway = remember { AuthGateway(authRepository) }
             val imageDiskCache = remember(context) { ImageDiskCache(context) }
             val postsRepository = remember { PostsRepositoryImpl(socketClient) }
-            val homeGateway = remember { HomeGateway(postsRepository, imageDiskCache) }
+            val homeGateway = remember { HomeGateway(postsRepository, imageDiskCache, pluginManager) }
             val musicRuntime = remember(context.applicationContext) {
                 MusicRuntime.get(context.applicationContext)
             }
@@ -219,9 +222,15 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(Unit) {
                 notificationManager.ensureChannels()
+                pluginManager.emit(ElementPluginEvent.AppStarted)
+            }
+
+            LaunchedEffect(effectiveThemeMode) {
+                pluginManager.emit(ElementPluginEvent.ThemeChanged(effectiveThemeMode == AppThemeMode.Dark))
             }
 
             fun clearActiveAccountState() {
+                pluginManager.emit(ElementPluginEvent.SessionChanged(accountId = null, isAuthorized = false))
                 socketClient.setAuthorizationSessionKey(null)
                 musicRuntime.clearSession()
                 accountName = null
@@ -268,6 +277,7 @@ class MainActivity : ComponentActivity() {
                 goldHistory = auth.goldHistory
                 notificationsCount = auth.notificationsCount
                 accountId = auth.accountId ?: fallback?.accountId
+                pluginManager.emit(ElementPluginEvent.SessionChanged(accountId = auth.accountId ?: fallback?.accountId, isAuthorized = true))
                 isAdmin = auth.isAdmin
                 launchState = LaunchState.Authorized
             }
