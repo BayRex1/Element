@@ -19,9 +19,9 @@ import top.canyie.pine.callback.MethodHook;
 /**
  * In-process ART hook backend used by Python plugins.
  *
- * Pine is intentionally enabled only on arm64 and Android API 26-35. Its published
- * native backend does not support x86_64 and upstream 0.3.0 does not declare
- * Android 16 support. Unsupported devices get a clear error instead of a crash.
+ * Pine is enabled on arm64 and Android API 26+. Upstream Pine 0.3.0 does not
+ * officially support Android 16+, so those versions are experimental: initialization
+ * and hook installation must be verified on-device. x86_64 remains unsupported.
  */
 public final class ElementPythonHookBridge {
     private static final String TAG = "ElementPluginHooks";
@@ -34,7 +34,7 @@ public final class ElementPythonHookBridge {
     private ElementPythonHookBridge() {}
 
     public static boolean isSupported() {
-        if (Build.VERSION.SDK_INT < 26 || Build.VERSION.SDK_INT > 35) return false;
+        if (Build.VERSION.SDK_INT < 26) return false;
         for (String abi : Build.SUPPORTED_ABIS) {
             if ("arm64-v8a".equals(abi)) return true;
         }
@@ -42,7 +42,6 @@ public final class ElementPythonHookBridge {
     }
 
     public static String getUnavailableReason() {
-        if (Build.VERSION.SDK_INT > 35) return "Pine 0.3.0 не заявляет поддержку Android 16/API 36+";
         if (Build.VERSION.SDK_INT < 26) return "Требуется Android 8.0/API 26+";
         return "Нативный backend Pine поддерживает только arm64-v8a; x86_64 не поддерживается";
     }
@@ -56,6 +55,9 @@ public final class ElementPythonHookBridge {
                 return false;
             }
             try {
+                if (Build.VERSION.SDK_INT >= 36) {
+                    Log.w(TAG, "Android API 36+ is not officially supported by Pine 0.3.0; attempting experimental initialization");
+                }
                 PineConfig.debug = BuildConfig.DEBUG;
                 PineConfig.debuggable = BuildConfig.DEBUG;
                 // Avoid globally changing Android hidden-API policy just to enable plugin hooks.
