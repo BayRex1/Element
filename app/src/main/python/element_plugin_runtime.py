@@ -29,7 +29,7 @@ def load_plugin(path, bridge):
     instance = plugin_class(bridge)
     metadata = {
         "id": namespace.get("__id__", os.path.splitext(os.path.basename(path))[0]),
-        "name": namespace.get("__name__", ""),
+        "name": namespace.get("__name__") if namespace.get("__name__") not in (None, "", "__element_plugin__") else namespace.get("__id__", ""),
         "description": namespace.get("__description__", ""),
         "version": namespace.get("__version__", "1.0.0"),
         "author": namespace.get("__author__", "Unknown"),
