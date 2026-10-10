@@ -27,6 +27,22 @@ def load_plugin(path, bridge):
         plugin_class = candidates[0]
 
     instance = plugin_class(bridge)
+    metadata = {
+        "id": namespace.get("__id__", os.path.splitext(os.path.basename(path))[0]),
+        "name": namespace.get("__name__", ""),
+        "description": namespace.get("__description__", ""),
+        "version": namespace.get("__version__", "1.0.0"),
+        "author": namespace.get("__author__", "Unknown"),
+        "icon": namespace.get("__icon__", "🧩"),
+    }
+    for key, value in metadata.items():
+        if value not in (None, ""):
+            setattr(instance, key, value)
+    try:
+        import plugin_settings
+        plugin_settings.bind(instance)
+    except Exception:
+        pass
     instance._run_load()
     _loaded[id(instance)] = instance
     return instance
