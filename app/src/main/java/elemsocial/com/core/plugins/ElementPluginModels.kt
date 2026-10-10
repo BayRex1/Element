@@ -239,6 +239,20 @@ object ElementPluginRuntime {
             }
         }
     }
+    fun openPluginSettings(pluginId: String): Boolean {
+        val pair = pythonLoaded.firstOrNull { it.first.id == pluginId } ?: return false
+        return runCatching {
+            val result = Python.getInstance().getModule("element_plugin_runtime")
+                .callAttr("open_legacy_settings", pair.second)
+            result.toString().equals("True", ignoreCase = true)
+        }.onFailure {
+            appContext?.let { ctx ->
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(ctx, "Настройки плагина: " + (it.message ?: "ошибка"), Toast.LENGTH_LONG).show()
+                }
+            }
+        }.getOrDefault(false)
+    }
     fun emitServerEvent(event: Map<String, Any?>) {
         _serverEvents.tryEmit(event)
         dispatchPythonHook("server.event", event)
@@ -411,7 +425,10 @@ object ElementPluginRuntime {
                 value = value.optString("value", ""),
                 checked = value.optBoolean("checked", false),
                 enabled = value.optBoolean("enabled", true),
-                children = children
+                children = children,
+                options = value.optJSONArray("options")?.let { array ->
+                    (0 until array.length()).map { index -> array.optString(index) }
+                } ?: emptyList()
             )
         }
         val nodes = mutableListOf<ElementPluginUiNode>()
