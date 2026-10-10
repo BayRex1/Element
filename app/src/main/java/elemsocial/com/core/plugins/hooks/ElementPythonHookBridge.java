@@ -85,7 +85,7 @@ public final class ElementPythonHookBridge {
             @Override public void beforeCall(Pine.CallFrame frame) {
                 ElementMethodHookParam param = new ElementMethodHookParam(frame);
                 try {
-                    if (hasCallbackAttr(callback, "before_hooked_method")) {
+                    if (callback.containsKey("before_hooked_method")) {
                         callback.callAttr("before_hooked_method", param);
                     }
                 } catch (Throwable error) {
@@ -100,7 +100,7 @@ public final class ElementPythonHookBridge {
                 param.result = frame.getResult();
                 param.throwable = frame.getThrowable();
                 try {
-                    if (hasCallbackAttr(callback, "after_hooked_method")) {
+                    if (callback.containsKey("after_hooked_method")) {
                         callback.callAttr("after_hooked_method", param);
                     }
                 } catch (Throwable error) {
@@ -118,15 +118,6 @@ public final class ElementPythonHookBridge {
             PLUGIN_HOOKS.computeIfAbsent(owner, ignored -> new CopyOnWriteArrayList<>()).add(handle);
         }
         return handle;
-    }
-
-    private static boolean hasCallbackAttr(PyObject callback, String name) {
-        try {
-            callback.getAttr(name);
-            return true;
-        } catch (Throwable ignored) {
-            return false;
-        }
     }
 
     private static void applyBefore(Pine.CallFrame frame, ElementMethodHookParam param) {
