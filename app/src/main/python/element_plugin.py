@@ -277,16 +277,16 @@ class BasePlugin:
         return None
 
     def hook_method(self, method_or_constructor, xposed_hook=None, priority=None, before=None, after=None):
-        raise NotImplementedError(
-            "Element пока не предоставляет backend для Xposed/Pine hooks; "
-            "используйте события Element Plugin API."
-        )
+        self.ui.toast("Java method hooks (Xposed/Pine) пока не поддерживаются Element", True)
+        return None
 
     def hook_all_methods(self, hook_class, method_name, xposed_hook=None, priority=None, before=None, after=None):
-        raise NotImplementedError("Element пока не поддерживает перехват произвольных Java-методов.")
+        self.ui.toast("Перехват Java-методов пока не поддерживается Element", True)
+        return None
 
     def hook_all_constructors(self, hook_class, xposed_hook=None, priority=None, before=None, after=None):
-        raise NotImplementedError("Element пока не поддерживает перехват произвольных Java-конструкторов.")
+        self.ui.toast("Перехват Java-конструкторов пока не поддерживается Element", True)
+        return None
 
     def unhook_method(self, unhook):
         return None
