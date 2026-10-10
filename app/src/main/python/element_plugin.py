@@ -157,7 +157,6 @@ class BasePlugin:
     def __init__(self, bridge):
         self._bridge = bridge
         self._hooks = {}
-        self._legacy_hooks = set()
         self._native_hooks = []
         self.id = ""
         self.name = ""
@@ -207,24 +206,6 @@ class BasePlugin:
             callbacks.remove(callback)
         self._bridge.unregister_hook(str(event), callback)
 
-    def add_hook(self, name, match_substring=False, priority=0):
-        """Compatibility with NimarkoGram's named event hooks.
-
-        Element can dispatch app lifecycle and server events. This does not
-        install arbitrary Java method hooks.
-        """
-        if name:
-            self._legacy_hooks.add(str(name))
-
-    def add_on_send_message_hook(self, priority=0):
-        self.add_hook("send_message_hook", priority=priority)
-
-    def remove_hook(self, name):
-        self._legacy_hooks.discard(str(name))
-        callbacks = list(self._hooks.get(str(name), []))
-        for callback in callbacks:
-            self.unhook(name, callback)
-
     def get_setting(self, key, default=None):
         import json
         raw = self.storage.get("setting:" + str(key))
@@ -235,7 +216,7 @@ class BasePlugin:
         except Exception:
             return raw
 
-    def set_setting(self, key, value, reload_settings=False):
+    def set_setting(self, key, value):
         import json
         key = str(key)
         self.storage.set("setting:" + key, json.dumps(value, ensure_ascii=False))
@@ -267,15 +248,12 @@ class BasePlugin:
                     result[str(key)] = raw
         return result
 
-    def import_settings(self, settings, reload_settings=True):
+    def import_settings(self, settings):
         import json
         keys = list(settings.keys()) if isinstance(settings, dict) else []
         for key, value in (settings.items() if isinstance(settings, dict) else []):
             self.storage.set("setting:" + str(key), json.dumps(value, ensure_ascii=False))
         self.storage.set("__setting_keys", json.dumps(keys, ensure_ascii=False))
-
-    def reload_settings(self):
-        return None
 
     def _make_method_hook(self, callback=None, before=None, after=None):
         if callback is not None and hasattr(callback, "replace_hooked_method"):
@@ -398,7 +376,6 @@ class BasePlugin:
                 for callback in list(callbacks):
                     self._bridge.unregister_hook(event, callback)
             self._hooks.clear()
-            self._legacy_hooks.clear()
             try:
                 from elemsocial.com.core.plugins.hooks import ElementPythonHookBridge
                 ElementPythonHookBridge.unhookAll(self.id)
