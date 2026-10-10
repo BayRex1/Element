@@ -58,6 +58,20 @@ private val AmoledColorScheme = darkColorScheme(
     onError = Color.White
 )
 
+private val HalloweenColorScheme = darkColorScheme(
+    primary = Color(0xFFFF7A18),
+    onPrimary = Color(0xFF1A0E20),
+    secondary = Color(0xFFB28CFF),
+    onSecondary = Color(0xFF1A0E20),
+    tertiary = Color(0xFFFFB45C),
+    background = Color(0xFF100B18),
+    onBackground = Color(0xFFFFF7EF),
+    surface = Color(0xFF21152B),
+    onSurface = Color(0xFFFFF7EF),
+    error = Color(0xFFFF5364),
+    onError = Color.White
+)
+
 @Composable
 fun ElementTheme(
     themeMode: AppThemeMode = AppThemeMode.Light,
@@ -77,6 +91,7 @@ fun ElementTheme(
         }
 
         resolvedMode == AppThemeMode.Amoled -> AmoledColorScheme
+        resolvedMode == AppThemeMode.Halloween -> HalloweenColorScheme
         isDarkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

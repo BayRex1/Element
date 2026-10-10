@@ -7,7 +7,8 @@ enum class AppThemeMode(val value: String) {
     System("system"),
     Light("light"),
     Dark("dark"),
-    Amoled("amoled");
+    Amoled("amoled"),
+    Halloween("halloween");
 
     companion object {
         fun from(value: String?): AppThemeMode {

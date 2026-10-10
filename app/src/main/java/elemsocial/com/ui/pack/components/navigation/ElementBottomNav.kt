@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -20,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.res.painterResource
@@ -62,7 +64,24 @@ fun ElementBottomNav(
         modifier = modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 10.dp).padding(bottom = 6.dp),
         contentAlignment = Alignment.Center
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth().widthIn(max = 520.dp).height(68.dp)) {
+        BoxWithConstraints(
+            Modifier.fillMaxWidth().widthIn(max = 520.dp).height(68.dp)
+                .pointerInput(items.size, constraints.maxWidth) {
+                    detectDragGestures(
+                        onDragStart = { position ->
+                            val target = (position.x / constraints.maxWidth.toFloat() * items.size)
+                                .toInt().coerceIn(items.indices)
+                            onSelect(target)
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val target = (change.position.x / constraints.maxWidth.toFloat() * items.size)
+                                .toInt().coerceIn(items.indices)
+                            onSelect(target)
+                        }
+                    )
+                }
+        ) {
             val pad = 6.dp
             val segmentWidth = (maxWidth - pad * 2) / items.size
             val sliderOffset by animateDpAsState(
