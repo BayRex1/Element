@@ -202,6 +202,8 @@ object ElementPluginRuntime {
         if (!Python.isStarted()) Python.start(AndroidPlatform(app))
         ElementPluginStore(app).loadAll().forEach { loadPlugin(app, it) }
         publish()
+        dispatchPythonHook("app.start", emptyMap())
+        dispatchPythonHook("app.resume", emptyMap())
     }
 
     @Synchronized fun reload(context: Context) {
@@ -210,6 +212,7 @@ object ElementPluginRuntime {
     }
 
     @Synchronized fun detach() {
+        dispatchPythonHook("app.stop", emptyMap())
         unloadAll()
         manager = null
         postOpener = null
@@ -219,6 +222,9 @@ object ElementPluginRuntime {
     }
 
     fun setUser(user: ElementPluginUser) { currentUserValue = user }
+    fun emitAppEvent(event: String, payload: Map<String, Any?> = emptyMap()) {
+        dispatchPythonHook(event, payload)
+    }
     fun closeUiScreen() { _uiScreen.value = null }
     fun invokeUiCallback(callbackId: String, payloadJson: String = "{}") {
         pythonUiCallbacks[callbackId]?.let { callback ->
@@ -426,6 +432,39 @@ object ElementPluginRuntime {
                 Handler(Looper.getMainLooper()).post {
                     Toast.makeText(appContext, "Plugin hook " + event + ": " + (it.message ?: "error"), Toast.LENGTH_SHORT).show()
                 }
+            }
+        }
+        val legacyEvent = when (event) {
+            "app.start" -> "START"
+            "app.stop" -> "STOP"
+            "app.pause" -> "PAUSE"
+            "app.resume" -> "RESUME"
+            else -> null
+        }
+        if (legacyEvent != null) {
+            pythonLoaded.toList().forEach { (_, instance) ->
+                runCatching { instance.callAttr("on_app_event", legacyEvent) }.onFailure {
+                    Handler(Looper.getMainLooper()).post {
+                        Toast.makeText(appContext, "Plugin lifecycle " + event + ": " + (it.message ?: "error"), Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        when (event) {
+            "send_message_hook" -> pythonLoaded.toList().forEach { (_, instance) ->
+                runCatching { instance.callAttr("on_send_message_hook", payload["account"] ?: 0, payload["params"] ?: emptyMap<String, Any?>()) }
+            }
+            "request.before" -> pythonLoaded.toList().forEach { (_, instance) ->
+                runCatching { instance.callAttr("pre_request_hook", payload["request_name"] ?: "", payload["account"] ?: 0, payload["request"] ?: emptyMap<String, Any?>()) }
+            }
+            "request.after" -> pythonLoaded.toList().forEach { (_, instance) ->
+                runCatching { instance.callAttr("post_request_hook", payload["request_name"] ?: "", payload["account"] ?: 0, payload["response"] ?: emptyMap<String, Any?>(), payload["error"]) }
+            }
+            "update" -> pythonLoaded.toList().forEach { (_, instance) ->
+                runCatching { instance.callAttr("on_update_hook", payload["update_name"] ?: "", payload["account"] ?: 0, payload["update"] ?: emptyMap<String, Any?>()) }
+            }
+            "updates" -> pythonLoaded.toList().forEach { (_, instance) ->
+                runCatching { instance.callAttr("on_updates_hook", payload["container_name"] ?: "", payload["account"] ?: 0, payload["updates"] ?: emptyMap<String, Any?>()) }
             }
         }
     }
