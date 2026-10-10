@@ -50,11 +50,12 @@ class MethodReplacement(BaseHook):
         raise NotImplementedError
 
 
-class AppEvent(Enum):
-    START = "app.start"
-    STOP = "app.stop"
-    PAUSE = "app.pause"
-    RESUME = "app.resume"
+class AppEvent:
+    # String constants match the event values passed by Element's runtime.
+    START = "START"
+    STOP = "STOP"
+    PAUSE = "PAUSE"
+    RESUME = "RESUME"
 
 
 class MenuItemType(Enum):
