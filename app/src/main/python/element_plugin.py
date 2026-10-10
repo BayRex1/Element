@@ -236,7 +236,15 @@ class BasePlugin:
 
     def set_setting(self, key, value, reload_settings=False):
         import json
-        self.storage.set("setting:" + str(key), json.dumps(value, ensure_ascii=False))
+        key = str(key)
+        self.storage.set("setting:" + key, json.dumps(value, ensure_ascii=False))
+        try:
+            keys = json.loads(self.storage.get("__setting_keys", "[]"))
+        except Exception:
+            keys = []
+        if key not in keys:
+            keys.append(key)
+        self.storage.set("__setting_keys", json.dumps(keys, ensure_ascii=False))
 
     def export_settings(self):
         import json
