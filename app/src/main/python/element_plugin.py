@@ -278,6 +278,15 @@ class BasePlugin:
         return None
 
     def _make_method_hook(self, callback=None, before=None, after=None):
+        if callback is not None and hasattr(callback, "replace_hooked_method"):
+            class _Replacement:
+                def before_hooked_method(self, param):
+                    result = callback.replace_hooked_method(param)
+                    if not getattr(param, "returnEarly", False):
+                        param.setResult(result)
+                def after_hooked_method(self, param):
+                    return None
+            return _Replacement()
         if callback is not None:
             return callback
         class _Callbacks:
