@@ -40,21 +40,27 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973"
 
-      - name: Create temporary CI signing key
+      - name: Restore repository signing key
         shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          keytool -genkeypair -v \
-            -keystore "$RUNNER_TEMP/ci-debug.keystore" \
-            -storepass android \
-            -keypass android \
-            -alias ci-debug \
-            -dname "CN=GitHub Actions Debug,O=CI,C=US" \
-            -keyalg RSA -keysize 2048 -validity 10000
+          set -euo pipefail
+          if [[ -z "${KEYSTORE_BASE64}" || -z "${KEYSTORE_PASSWORD}" || -z "${KEY_ALIAS}" || -z "${KEY_PASSWORD}" ]]; then
+            echo "::error::Signing secrets are missing. Configure KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD in repository Actions secrets."
+            exit 1
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/element-signing.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
           {
-            echo "KEYSTORE_FILE=$RUNNER_TEMP/ci-debug.keystore"
-            echo "KEYSTORE_PASSWORD=android"
-            echo "KEY_ALIAS=ci-debug"
-            echo "KEY_PASSWORD=android"
+            echo "KEYSTORE_FILE=$KEYSTORE_PATH"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "KEY_ALIAS=$KEY_ALIAS"
+            echo "KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$GITHUB_ENV"
 
       - name: Set up Gradle
