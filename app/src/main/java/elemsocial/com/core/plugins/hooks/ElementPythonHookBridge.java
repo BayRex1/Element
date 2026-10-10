@@ -120,7 +120,16 @@ public final class ElementPythonHookBridge {
         return handle;
     }
 
-    private static boolean hasCallbackAttr(PyObject callback, String name) {\n        try {\n            callback.getAttr(name);\n            return true;\n        } catch (Throwable ignored) {\n            return false;\n        }\n    }\n\n    private static void applyBefore(Pine.CallFrame frame, ElementMethodHookParam param) {
+    private static boolean hasCallbackAttr(PyObject callback, String name) {
+        try {
+            callback.getAttr(name);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static void applyBefore(Pine.CallFrame frame, ElementMethodHookParam param) {
         if (param.args != null) frame.args = param.args;
         frame.thisObject = param.thisObject;
         if (param.returnEarly) {
