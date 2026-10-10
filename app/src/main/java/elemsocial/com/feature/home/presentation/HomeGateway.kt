@@ -2,6 +2,7 @@ package elemsocial.com.feature.home.presentation
 
 import elemsocial.com.core.cache.ImageDiskCache
 import elemsocial.com.core.plugins.ElementPluginManager
+import elemsocial.com.core.plugins.ElementPluginEvent
 import elemsocial.com.domain.model.ActionResult
 import elemsocial.com.domain.model.CommentsResult
 import elemsocial.com.domain.model.FeedResult
@@ -54,7 +55,7 @@ class HomeGateway(
         if (intercepted?.cancelled == true) {
             return ActionResult(status = "error", message = intercepted.cancelReason ?: "Публикация отменена плагином")
         }
-        return postsRepository.createPost(
+        val result = postsRepository.createPost(
             text = intercepted?.replacementText ?: text,
             files = files,
             songs = songs,
@@ -64,6 +65,10 @@ class HomeGateway(
             clearMetadataImage = clearMetadataImage,
             censoringImage = censoringImage
         )
+        if (result.status.equals("success", ignoreCase = true)) {
+            pluginManager?.emit(ElementPluginEvent.PostAction(action = "created"))
+        }
+        return result
     }
 
     suspend fun editPost(postId: Int, text: String): ActionResult =
