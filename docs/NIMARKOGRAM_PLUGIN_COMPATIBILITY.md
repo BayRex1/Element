@@ -19,8 +19,9 @@ explicit unhooking. Hooks are installed in Element's own process; they do not af
 apps. Plugin hooks are removed when their plugin unloads.
 
 For safety, this backend is enabled only on arm64-v8a devices running Android API 26-35.
-Pine 0.3.0 does not declare x86_64 or Android 16/API 36+ support. Unsupported devices
-report the limitation instead of attempting native initialization. Priority values are
+Pine 0.3.0 does not declare x86_64 or Android 16/API 36+ support. Some devices using
+16 KB memory pages may also reject the published native library; initialization errors are
+caught and reported instead of being treated as a successful hook. Priority values are
 accepted for source compatibility but currently do not reorder Pine callbacks.
 
 ## Important limits
