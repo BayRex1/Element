@@ -1,7 +1,7 @@
 """Small compatibility helpers for Python plugins running in Element.
 
-This module resolves Java classes, but does not install hooks. Method-hook
-installation requires a dedicated backend that Element does not currently ship.
+This module resolves Java classes. Java method hooks are installed through the native
+Pine backend on supported arm64 Android versions; unsupported devices report an error.
 """
 
 
