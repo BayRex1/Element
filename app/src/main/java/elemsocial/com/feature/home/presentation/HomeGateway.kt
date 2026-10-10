@@ -1,6 +1,7 @@
 package elemsocial.com.feature.home.presentation
 
 import elemsocial.com.core.cache.ImageDiskCache
+import elemsocial.com.core.plugins.ElementPluginManager
 import elemsocial.com.domain.model.ActionResult
 import elemsocial.com.domain.model.CommentsResult
 import elemsocial.com.domain.model.FeedResult
@@ -22,7 +23,8 @@ import kotlinx.coroutines.withContext
 
 class HomeGateway(
     private val postsRepository: PostsRepository,
-    private val imageDiskCache: ImageDiskCache? = null
+    private val imageDiskCache: ImageDiskCache? = null,
+    private val pluginManager: ElementPluginManager? = null
 ) {
     private companion object {
         const val VARIANT_IMAGE = "webp"
@@ -47,9 +49,22 @@ class HomeGateway(
         poll: PostPoll? = null,
         clearMetadataImage: Boolean = false,
         censoringImage: Boolean = false
-    ): ActionResult = postsRepository.createPost(
-        text, files, songs, fromChannelId, wallUsername, poll, clearMetadataImage, censoringImage
-    )
+    ): ActionResult {
+        val intercepted = pluginManager?.beforePublish(text) 
+        if (intercepted?.cancelled == true) {
+            return ActionResult(status = "error", message = intercepted.cancelReason ?: "Публикация отменена плагином")
+        }
+        return postsRepository.createPost(
+            text = intercepted?.replacementText ?: text,
+            files = files,
+            songs = songs,
+            fromChannelId = fromChannelId,
+            wallUsername = wallUsername,
+            poll = poll,
+            clearMetadataImage = clearMetadataImage,
+            censoringImage = censoringImage
+        )
+    }
 
     suspend fun editPost(postId: Int, text: String): ActionResult =
         postsRepository.editPost(postId, text)
