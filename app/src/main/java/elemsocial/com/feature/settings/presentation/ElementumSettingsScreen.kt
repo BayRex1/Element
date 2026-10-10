@@ -341,7 +341,7 @@ fun ElementumPluginsScreen(
                                 Text("v${plugin.version} · ${plugin.author}", color = ElementUiPalette.TextLite, fontSize = 11.sp)
                             }
 
-                            androidx.compose.material3.IconButton(onClick = { settingsPlugin = plugin }) {
+                            androidx.compose.material3.IconButton(onClick = { if (!ElementPluginRuntime.openPluginSettings(plugin.id)) settingsPlugin = plugin }) {
                                 Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = ElementUiPalette.TextSecondary)
                             }
                             androidx.compose.material3.IconButton(onClick = {

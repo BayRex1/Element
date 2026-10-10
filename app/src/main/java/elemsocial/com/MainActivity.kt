@@ -38,6 +38,7 @@ import androidx.core.view.WindowCompat
 import elemsocial.com.config.AppConfig
 import elemsocial.com.core.cache.ImageDiskCache
 import elemsocial.com.core.cache.MusicCacheIndexStore
+import elemsocial.com.core.plugins.ElementPluginRuntime
 import elemsocial.com.core.model.TransparencyMode
 import elemsocial.com.core.notifications.ElementNotificationManager
 import elemsocial.com.core.session.AccountSessionsStore
@@ -700,6 +701,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ElementPluginRuntime.emitAppEvent("app.resume")
+    }
+
+    override fun onPause() {
+        ElementPluginRuntime.emitAppEvent("app.pause")
+        super.onPause()
     }
 }
 

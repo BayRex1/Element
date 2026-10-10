@@ -70,6 +70,9 @@ android {
 }
 
 dependencies {
+    // In-process ART method hooks for Python plugin compatibility (arm64 only at runtime).
+    implementation 'top.canyie.pine:core:0.3.0'
+
     def composeBom = platform('androidx.compose:compose-bom:2024.09.00')
 
     // Jetpack Compose
