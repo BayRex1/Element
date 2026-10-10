@@ -6,6 +6,8 @@ import android.util.Log;
 import com.chaquo.python.PyObject;
 
 import java.lang.reflect.Member;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -108,6 +110,9 @@ public final class ElementPythonHookBridge {
                 applyAfter(frame, param);
             }
         });
+        if (unhook == null) {
+            throw new IllegalStateException("Pine did not install hook for " + member);
+        }
         HookHandle handle = new HookHandle(unhook, owner, member);
         if (!owner.isEmpty()) {
             PLUGIN_HOOKS.computeIfAbsent(owner, ignored -> new CopyOnWriteArrayList<>()).add(handle);
@@ -180,6 +185,7 @@ public final class ElementPythonHookBridge {
         public boolean returnEarly;
         boolean resultChanged;
         boolean throwableChanged;
+        private final Map<String, Object> extras = new HashMap<>();
 
         ElementMethodHookParam(Pine.CallFrame frame) {
             this.thisObject = frame.thisObject;
@@ -210,7 +216,10 @@ public final class ElementPythonHookBridge {
             if (throwable != null) throw throwable;
             return result;
         }
-        public void setObjectExtra(String key, Object value) {}
-        public Object getObjectExtra(String key) { return null; }
+        public void setObjectExtra(String key, Object value) {
+            if (key == null) return;
+            if (value == null) extras.remove(key); else extras.put(key, value);
+        }
+        public Object getObjectExtra(String key) { return extras.get(key); }
     }
 }
