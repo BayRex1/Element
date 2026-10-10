@@ -11,6 +11,17 @@ Python plugins:
 - class lookup through `hook_utils.find_class`
 - basic `android_utils.log`, `run_on_ui_thread`, and `is_on_ui_thread` helpers
 
+## On-device compatibility diagnostic
+
+Install [`element_compatibility_diagnostic.plugin`](plugins/element_compatibility_diagnostic.plugin)
+as a regular Element Python plugin and open its **Compatibility report** screen. It checks
+compatibility imports, settings read/write, Java class lookup, the Android UI-thread helper,
+and a real before/after native-hook callback that changes the return value of a dedicated,
+side-effect-free Element diagnostic method. The hook is removed in a `finally` block.
+
+The report only verifies the APIs exercised on the current device and build. It does not
+prove that every third-party plugin works, nor does it test Telegram-specific integrations.
+
 ## Native method-hook backend
 
 Element now includes Pine 0.3.0 and a Java adapter for Python callbacks. The API supports
