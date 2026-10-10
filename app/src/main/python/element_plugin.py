@@ -18,13 +18,43 @@ class _Storage:
 
 
 class _Theme:
+    """Helpers for changing Element's shared UI palette from a plugin."""
     def __init__(self, bridge):
         self._bridge = bridge
+
     def set(self, **kwargs):
         # Pass JSON instead of a Python dict: Chaquopy does not reliably
         # convert arbitrary Python dicts to Kotlin Map parameters.
         import json
         self._bridge.set_theme_json(json.dumps(kwargs))
+
+    def accent(self, color):
+        """Set the global accent color using the same format as theme.set()."""
+        self.set(accent=color)
+
+    def surfaces(self, body=None, block=None, block_soft=None):
+        """Override the app body and card surfaces without changing text colors."""
+        values = {}
+        if body is not None:
+            values["body"] = body
+        if block is not None:
+            values["block"] = block
+        if block_soft is not None:
+            values["blockSoft"] = block_soft
+        if values:
+            self.set(**values)
+
+    def halloween(self):
+        """Apply a dark plum palette with pumpkin-orange accents."""
+        self.set(
+            body="#100B18",
+            block="#21152B",
+            blockSoft="#35203D",
+            accent="#FF7A18",
+            textPrimary="#FFF7EF",
+            textSecondary="#D8C6DF",
+        )
+
     def reset(self):
         self._bridge.reset_theme()
 
