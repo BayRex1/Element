@@ -338,3 +338,9 @@ class BasePlugin:
                 for callback in list(callbacks):
                     self._bridge.unregister_hook(event, callback)
             self._hooks.clear()
+            self._legacy_hooks.clear()
+            try:
+                import plugin_settings
+                plugin_settings.unbind(self.id)
+            except Exception:
+                pass
