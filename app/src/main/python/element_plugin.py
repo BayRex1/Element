@@ -158,6 +158,7 @@ class BasePlugin:
         self._bridge = bridge
         self._hooks = {}
         self._legacy_hooks = set()
+        self._native_hooks = []
         self.id = ""
         self.name = ""
         self.description = ""
@@ -276,20 +277,67 @@ class BasePlugin:
     def reload_settings(self):
         return None
 
+    def _make_method_hook(self, callback=None, before=None, after=None):
+        if callback is not None:
+            return callback
+        class _Callbacks:
+            def before_hooked_method(self, param):
+                if before is not None:
+                    return before(param)
+            def after_hooked_method(self, param):
+                if after is not None:
+                    return after(param)
+        return _Callbacks()
+
     def hook_method(self, method_or_constructor, xposed_hook=None, priority=None, before=None, after=None):
-        self.ui.toast("Java method hooks (Xposed/Pine) пока не поддерживаются Element", True)
-        return None
+        """Install an in-process ART hook on arm64 Android 8-15.
+
+        Callback objects should implement before_hooked_method/after_hooked_method,
+        or callers can pass plain before=/after= callables.
+        """
+        callback = self._make_method_hook(xposed_hook, before, after)
+        try:
+            from elemsocial.com.core.plugins.hooks import ElementPythonHookBridge
+            handle = ElementPythonHookBridge.hook(
+                method_or_constructor, self.id, callback, int(priority if priority is not None else 50)
+            )
+            self._native_hooks.append(handle)
+            return handle
+        except Exception as exc:
+            self.ui.toast("Не удалось установить Java hook: " + str(exc), True)
+            return None
 
     def hook_all_methods(self, hook_class, method_name, xposed_hook=None, priority=None, before=None, after=None):
-        self.ui.toast("Перехват Java-методов пока не поддерживается Element", True)
-        return None
+        handles = []
+        try:
+            for method in hook_class.getDeclaredMethods():
+                if str(method.getName()) == str(method_name):
+                    handle = self.hook_method(method, xposed_hook, priority, before, after)
+                    if handle is not None:
+                        handles.append(handle)
+        except Exception as exc:
+            self.ui.toast("Не удалось установить hooks методов: " + str(exc), True)
+        return handles
 
     def hook_all_constructors(self, hook_class, xposed_hook=None, priority=None, before=None, after=None):
-        self.ui.toast("Перехват Java-конструкторов пока не поддерживается Element", True)
-        return None
+        handles = []
+        try:
+            for constructor in hook_class.getDeclaredConstructors():
+                handle = self.hook_method(constructor, xposed_hook, priority, before, after)
+                if handle is not None:
+                    handles.append(handle)
+        except Exception as exc:
+            self.ui.toast("Не удалось установить hooks конструкторов: " + str(exc), True)
+        return handles
 
     def unhook_method(self, unhook):
-        return None
+        try:
+            if unhook is not None:
+                unhook.unhook()
+                if unhook in self._native_hooks:
+                    self._native_hooks.remove(unhook)
+        except Exception as exc:
+            self.ui.toast("Не удалось снять Java hook: " + str(exc), True)
 
     def log(self, message):
         self.ui.toast("[" + (self.id or self.name or "plugin") + "] " + str(message), True)
@@ -342,6 +390,17 @@ class BasePlugin:
                     self._bridge.unregister_hook(event, callback)
             self._hooks.clear()
             self._legacy_hooks.clear()
+            try:
+                from elemsocial.com.core.plugins.hooks import ElementPythonHookBridge
+                ElementPythonHookBridge.unhookAll(self.id)
+            except Exception:
+                pass
+            for handle in list(self._native_hooks):
+                try:
+                    handle.unhook()
+                except Exception:
+                    pass
+            self._native_hooks.clear()
             try:
                 import plugin_settings
                 plugin_settings.unbind(self.id)
