@@ -203,7 +203,6 @@ object ElementPluginRuntime {
         ElementPluginStore(app).loadAll().forEach { loadPlugin(app, it) }
         publish()
         dispatchPythonHook("app.start", emptyMap())
-        dispatchPythonHook("app.resume", emptyMap())
     }
 
     @Synchronized fun reload(context: Context) {
