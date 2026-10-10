@@ -294,6 +294,9 @@ class BasePlugin:
     def log(self, message):
         self.ui.toast("[" + (self.id or self.name or "plugin") + "] " + str(message), True)
 
+    def create_settings(self):
+        return []
+
     def on_app_event(self, event_type):
         return None
 
