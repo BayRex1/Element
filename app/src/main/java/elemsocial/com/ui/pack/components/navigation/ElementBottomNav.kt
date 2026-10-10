@@ -66,16 +66,16 @@ fun ElementBottomNav(
     ) {
         BoxWithConstraints(
             Modifier.fillMaxWidth().widthIn(max = 520.dp).height(68.dp)
-                .pointerInput(items.size, constraints.maxWidth) {
+                .pointerInput(items.size) {
                     detectDragGestures(
                         onDragStart = { position ->
-                            val target = (position.x / constraints.maxWidth.toFloat() * items.size)
+                            val target = (position.x / size.width.toFloat().coerceAtLeast(1f) * items.size)
                                 .toInt().coerceIn(items.indices)
                             onSelect(target)
                         },
                         onDrag = { change, _ ->
                             change.consume()
-                            val target = (change.position.x / constraints.maxWidth.toFloat() * items.size)
+                            val target = (change.position.x / size.width.toFloat().coerceAtLeast(1f) * items.size)
                                 .toInt().coerceIn(items.indices)
                             onSelect(target)
                         }
