@@ -295,26 +295,40 @@ class BasePlugin:
             return None
 
     def hook_all_methods(self, hook_class, method_name, xposed_hook=None, priority=None, before=None, after=None):
+        """Hook matching declared methods; missing Java classes fail safely."""
         handles = []
+        if hook_class is None:
+            self.ui.toast("Не удалось установить Java hooks: класс не найден", True)
+            return handles
         try:
             for method in hook_class.getDeclaredMethods():
-                if str(method.getName()) == str(method_name):
+                try:
+                    if str(method.getName()) != str(method_name):
+                        continue
                     handle = self.hook_method(method, xposed_hook, priority, before, after)
                     if handle is not None:
                         handles.append(handle)
+                except Exception as exc:
+                    self.ui.toast("Не удалось установить hook метода " + str(method_name) + ": " + str(exc), True)
         except Exception as exc:
-            self.ui.toast("Не удалось установить hooks методов: " + str(exc), True)
+            self.ui.toast("Не удалось получить методы класса: " + str(exc), True)
         return handles
 
     def hook_all_constructors(self, hook_class, xposed_hook=None, priority=None, before=None, after=None):
         handles = []
+        if hook_class is None:
+            self.ui.toast("Не удалось установить Java hooks: класс не найден", True)
+            return handles
         try:
             for constructor in hook_class.getDeclaredConstructors():
-                handle = self.hook_method(constructor, xposed_hook, priority, before, after)
-                if handle is not None:
-                    handles.append(handle)
+                try:
+                    handle = self.hook_method(constructor, xposed_hook, priority, before, after)
+                    if handle is not None:
+                        handles.append(handle)
+                except Exception as exc:
+                    self.ui.toast("Не удалось установить hook конструктора: " + str(exc), True)
         except Exception as exc:
-            self.ui.toast("Не удалось установить hooks конструкторов: " + str(exc), True)
+            self.ui.toast("Не удалось получить конструкторы класса: " + str(exc), True)
         return handles
 
     def unhook_method(self, unhook):
