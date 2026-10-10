@@ -2,8 +2,9 @@
 
 Element's current declarative plugin screen supports text, buttons, switches,
 checkboxes, inputs, cards, rows, columns and dividers. These data models are
-provided so legacy plugins can import their settings definitions; automatic
-rendering of legacy create_settings() lists is not implemented yet.
+provided so legacy plugins can import their settings definitions. Switch, selector,
+input, text, header and divider rows are rendered from create_settings(); native
+custom Android View rows are still not supported.
 """
 from dataclasses import dataclass, field
 from typing import Any, Callable, List, Optional
