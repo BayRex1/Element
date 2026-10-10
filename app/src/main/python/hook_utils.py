@@ -9,9 +9,15 @@ def find_class(name, class_loader=None):
     if not name:
         return None
     try:
-        from java.lang import Class
-        if class_loader is not None:
-            return class_loader.loadClass(str(name))
+        from java.lang import Class, Thread
+        loader = class_loader
+        if loader is None:
+            loader = Thread.currentThread().getContextClassLoader()
+        if loader is not None:
+            try:
+                return loader.loadClass(str(name))
+            except Exception:
+                pass
         return Class.forName(str(name))
     except Exception:
         return None
