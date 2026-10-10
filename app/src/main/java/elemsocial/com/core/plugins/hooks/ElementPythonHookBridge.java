@@ -85,7 +85,7 @@ public final class ElementPythonHookBridge {
             @Override public void beforeCall(Pine.CallFrame frame) {
                 ElementMethodHookParam param = new ElementMethodHookParam(frame);
                 try {
-                    if (callback.hasAttr("before_hooked_method")) {
+                    if (callback.containsKey("before_hooked_method")) {
                         callback.callAttr("before_hooked_method", param);
                     }
                 } catch (Throwable error) {
@@ -100,7 +100,7 @@ public final class ElementPythonHookBridge {
                 param.result = frame.getResult();
                 param.throwable = frame.getThrowable();
                 try {
-                    if (callback.hasAttr("after_hooked_method")) {
+                    if (callback.containsKey("after_hooked_method")) {
                         callback.callAttr("after_hooked_method", param);
                     }
                 } catch (Throwable error) {
