@@ -11,15 +11,22 @@ Python plugins:
 - class lookup through `hook_utils.find_class`
 - basic `android_utils.log`, `run_on_ui_thread`, and `is_on_ui_thread` helpers
 
+## Native method-hook backend
+
+Element now includes Pine 0.3.0 and a Java adapter for Python callbacks. The API supports
+`hook_method`, `hook_all_methods`, `hook_all_constructors`, method replacements, and
+explicit unhooking. Hooks are installed in Element's own process; they do not affect other
+apps. Plugin hooks are removed when their plugin unloads.
+
+For safety, this backend is enabled only on arm64-v8a devices running Android API 26-35.
+Pine 0.3.0 does not declare x86_64 or Android 16/API 36+ support. Unsupported devices
+report the limitation instead of attempting native initialization. Priority values are
+accepted for source compatibility but currently do not reorder Pine callbacks.
+
 ## Important limits
 
-This is a compatibility layer, not a full port of NimarkoGram's Android plugin engine.
-Element does **not** yet ship its Xposed/Pine method-hook backend. Consequently,
-`hook_method`, `hook_all_methods`, and `hook_all_constructors` do not install hooks.
-They show a notice and return `None`. The current runtime also does not implement
-Telegram-specific message/request/update interception, Android native custom settings
-views, Telegram context menus, or the full NimarkoGram helper-module surface.
-
-Plugins relying on those features need native Element-side implementations before
-they can behave equivalently. The compatibility API deliberately avoids pretending
-that unsupported hooks succeeded.
+This is still not a complete port of NimarkoGram's Android plugin engine. Telegram-specific
+send-message/request/update interception, resource hooks, Telegram context menus, native
+custom Android settings views, and the full NimarkoGram helper-module surface are not
+automatically provided by the generic method-hook backend. Those require separate,
+Element-specific integrations.
