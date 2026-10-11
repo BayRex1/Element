@@ -42,6 +42,8 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
@@ -83,6 +85,7 @@ import elemsocial.com.domain.model.MusicTrack
 import elemsocial.com.domain.model.OnlineUser
 import elemsocial.com.domain.model.PostImage
 import elemsocial.com.domain.model.PostImageAsset
+import elemsocial.com.domain.model.PostFile
 import elemsocial.com.domain.model.PostPoll
 import elemsocial.com.domain.model.PostReactions
 import elemsocial.com.domain.model.PostsCategory
@@ -100,6 +103,8 @@ import elemsocial.com.ui.pack.components.posts.AttachedPollPreview
 import elemsocial.com.ui.pack.components.posts.ElementPostVideosBlock
 import elemsocial.com.ui.pack.components.posts.buildPostGovernItems
 import elemsocial.com.ui.pack.theme.ElementUiPalette
+import elemsocial.com.core.plugins.ElementPluginStore
+import elemsocial.com.core.plugins.ElementPluginRuntime
 import elemsocial.com.feature.music.presentation.MusicAttachedTracks
 import elemsocial.com.feature.music.presentation.MusicPickerModal
 import elemsocial.com.feature.music.presentation.PostMusicTracksBlock
@@ -1458,6 +1463,12 @@ private fun PostCard(
     onOpenImageViewer: (Int) -> Unit,
     onReactionToggle: (String, Boolean) -> Unit
 ) {
+    var pendingPluginFile by remember(post.id) { mutableStateOf<PostFile?>(null) }
+    var installingPlugin by remember(post.id) { mutableStateOf(false) }
+    val pluginInstallScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val pluginStore = remember(context) { ElementPluginStore(context) }
+
     val authorName = post.author?.name ?: "Удаленный аккаунт"
     val authorUsername = post.author?.username ?: "unknown"
     val authorProfileUsername = post.author?.username?.trim()?.takeIf {
@@ -1547,6 +1558,10 @@ private fun PostCard(
                 onDoubleTap = onDoubleLike
             )
         }
+        val pluginFiles = post.content.files.filter { it.name.lowercase(java.util.Locale.ROOT).endsWith(".plugin") }
+        if (pluginFiles.isNotEmpty()) {
+            PostPluginFilesBlock(files = pluginFiles, onInstall = { pendingPluginFile = it })
+        }
         if (post.content.videos.isNotEmpty()) {
             ElementPostVideosBlock(
                 videos = post.content.videos,
@@ -1561,6 +1576,53 @@ private fun PostCard(
                 },
                 onDoubleTapLike = onDoubleLike
             )
+        }
+    }
+
+    pendingPluginFile?.let { pluginFile ->
+        AlertDialog(
+            onDismissRequest = { if (!installingPlugin) pendingPluginFile = null },
+            title = { Text("Установить плагин?") },
+            text = { Text("«${pluginFile.name}» будет добавлен в Elementum и загружен в приложении. Устанавливайте плагины только от авторов, которым доверяете.") },
+            confirmButton = {
+                TextButton(enabled = !installingPlugin, onClick = {
+                    installingPlugin = true
+                    pluginInstallScope.launch {
+                        runCatching {
+                            val downloaded = homeGateway.loadFile(pluginFile) ?: error("Не удалось скачать файл плагина")
+                            pluginStore.savePlugin(downloaded.readBytes(), pluginFile.name).getOrThrow()
+                        }.onSuccess { installed ->
+                            ElementPluginRuntime.reload(context)
+                            Toast.makeText(context, "Плагин «${installed.name}» установлен", Toast.LENGTH_SHORT).show()
+                            pendingPluginFile = null
+                        }.onFailure { error ->
+                            Toast.makeText(context, "Не удалось установить плагин: ${error.message ?: "неверный файл"}", Toast.LENGTH_LONG).show()
+                        }
+                        installingPlugin = false
+                    }
+                }) { Text(if (installingPlugin) "Установка…" else "Установить") }
+            },
+            dismissButton = { TextButton(enabled = !installingPlugin, onClick = { pendingPluginFile = null }) { Text("Отмена") } }
+        )
+    }
+}
+
+@Composable
+private fun PostPluginFilesBlock(files: List<PostFile>, onInstall: (PostFile) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        files.forEach { file ->
+            UIKit.Block(modifier = Modifier.fillMaxWidth().clickable { onInstall(file) }, showShadow = false, contentPadding = 12.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(modifier = Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(ElementUiPalette.BlockSoft), contentAlignment = Alignment.Center) {
+                        Text("🧩", fontSize = 22.sp)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(file.name.ifBlank { "Плагин .plugin" }, color = ElementUiPalette.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text("Плагин Elementum · нажмите, чтобы установить", color = ElementUiPalette.TextSecondary, fontSize = 12.sp)
+                    }
+                    Text("Установить", color = ElementUiPalette.Accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
     }
 }
