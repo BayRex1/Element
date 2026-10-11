@@ -1350,9 +1350,11 @@ fun MainShell(
                 )
             ) {
                 ElementumSettingsScreen(
-                    { elementumSettingsOpen = false },
-                    homeGateway,
-                    Modifier.fillMaxSize()
+                    onBack = { elementumSettingsOpen = false },
+                    homeGateway = homeGateway,
+                    transparencyMode = transparencyMode,
+                    onTransparencyModeChanged = onTransparencyModeChanged,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }

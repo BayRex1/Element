@@ -57,6 +57,8 @@ import elemsocial.com.feature.home.presentation.HomeGateway
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import elemsocial.com.core.model.TransparencyMode
 import elemsocial.com.ui.pack.UIKit
 import elemsocial.com.ui.pack.theme.ElementUiPalette
 
@@ -64,9 +66,12 @@ import elemsocial.com.ui.pack.theme.ElementUiPalette
 fun ElementumSettingsScreen(
     onBack: () -> Unit,
     homeGateway: HomeGateway? = null,
+    transparencyMode: TransparencyMode = TransparencyMode.ADAPTIVE,
+    onTransparencyModeChanged: (TransparencyMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var pluginsOpen by remember { mutableStateOf(false) }
+    var interfaceOpen by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -136,6 +141,12 @@ fun ElementumSettingsScreen(
                         iconRes = R.drawable.ic_settings_plugins,
                         onClick = { pluginsOpen = true }
                     )
+                    ElementumMenuRow(
+                        title = "Интерфейс",
+                        subtitle = "Жидкое стекло и анимации",
+                        iconRes = R.drawable.ic_settings_plugins,
+                        onClick = { interfaceOpen = true }
+                    )
                 }
             }
 
@@ -145,6 +156,56 @@ fun ElementumSettingsScreen(
 
     if (pluginsOpen) {
         ElementumPluginsScreen(onClose = { pluginsOpen = false }, homeGateway = homeGateway)
+    }
+
+    if (interfaceOpen) {
+        UIKit.RoutedModal(
+            title = "Интерфейс",
+            onClose = { interfaceOpen = false }
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                UIKit.Block(modifier = Modifier.fillMaxWidth(), showShadow = false) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Жидкое стекло",
+                                color = ElementUiPalette.TextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Полупрозрачные панели, размытие и мягкие переходы",
+                                color = ElementUiPalette.TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Switch(
+                            checked = transparencyMode != TransparencyMode.OPAQUE,
+                            onCheckedChange = { enabled ->
+                                onTransparencyModeChanged(
+                                    if (enabled) TransparencyMode.TRANSPARENT
+                                    else TransparencyMode.OPAQUE
+                                )
+                            }
+                        )
+                    }
+                }
+                Text(
+                    text = if (transparencyMode != TransparencyMode.OPAQUE)
+                        "Жидкое стекло включено. Размытие доступно на Android 12 и новее."
+                    else
+                        "Жидкое стекло выключено: интерфейс будет непрозрачным.",
+                    color = ElementUiPalette.TextLite,
+                    fontSize = 13.sp
+                )
+            }
+        }
     }
 }
 
@@ -341,7 +402,7 @@ fun ElementumPluginsScreen(
                                 Text("v${plugin.version} · ${plugin.author}", color = ElementUiPalette.TextLite, fontSize = 11.sp)
                             }
 
-                            androidx.compose.material3.IconButton(onClick = { settingsPlugin = plugin }) {
+                            androidx.compose.material3.IconButton(onClick = { if (!ElementPluginRuntime.openPluginSettings(plugin.id)) settingsPlugin = plugin }) {
                                 Icon(Icons.Default.Settings, contentDescription = "Настройки", tint = ElementUiPalette.TextSecondary)
                             }
                             androidx.compose.material3.IconButton(onClick = {

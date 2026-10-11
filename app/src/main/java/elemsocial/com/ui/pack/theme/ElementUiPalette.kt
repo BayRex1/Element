@@ -71,6 +71,22 @@ private val AmoledPalette = ElementPalette(
     info = Color(0xFF5578B5)
 )
 
+private val HalloweenPalette = ElementPalette(
+    body = Color(0xFF100B18),
+    block = Color(0xFF21152B),
+    blockSoft = Color(0xFF35203D),
+    interaction = Color(0xB34A2B50),
+    interactionText = Color(0xD9FFFFFF),
+    accent = Color(0xFFFF7A18),
+    textPrimary = Color(0xFFFFF7EF),
+    textSecondary = Color(0xFFD8C6DF),
+    textLite = Color(0xFFA58DAF),
+    border = Color(0x66FF8A2A),
+    error = Color(0xFFFF5364),
+    success = Color(0xFF67D6A3),
+    info = Color(0xFFB28CFF)
+)
+
 object ElementUiPalette {
     private var activePalette by mutableStateOf(LightPalette)
     private var pluginOverrides by mutableStateOf<ElementPluginThemeOverrides?>(null)
@@ -126,6 +142,7 @@ object ElementUiPalette {
         activePalette = when (mode) {
             AppThemeMode.Dark -> DarkPalette
             AppThemeMode.Amoled -> AmoledPalette
+            AppThemeMode.Halloween -> HalloweenPalette
             AppThemeMode.Light,
             AppThemeMode.System -> LightPalette
         }

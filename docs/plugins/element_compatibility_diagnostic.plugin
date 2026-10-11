@@ -1,0 +1,153 @@
+# Element Compatibility Diagnostic
+# Install this .plugin file in Element, then open its plugin screen.
+from base_plugin import BasePlugin
+
+__id__ = "element_compatibility_diagnostic"
+__name__ = "Element Compatibility Diagnostic"
+__description__ = "Checks plugin APIs, Python helpers, settings storage, Java class lookup and a reversible native method hook."
+__version__ = "1.0.0"
+__author__ = "Element"
+
+
+class Plugin(BasePlugin):
+    def on_plugin_load(self):
+        self.run_diagnostics()
+
+    def run_diagnostics(self):
+        results = []
+
+        def record(name, ok, detail=""):
+            results.append({
+                "type": "text",
+                "text": ("PASS  " if ok else "FAIL  ") + name,
+                "secondary": str(detail or ""),
+            })
+
+        # Check the compatibility modules can be imported.
+        try:
+            from base_plugin import BasePlugin as ImportedBasePlugin
+            record("base_plugin.BasePlugin", ImportedBasePlugin is not None)
+        except Exception as exc:
+            record("base_plugin.BasePlugin", False, exc)
+
+        try:
+            import hook_utils
+            record("hook_utils import", callable(hook_utils.find_class))
+        except Exception as exc:
+            record("hook_utils import", False, exc)
+            hook_utils = None
+
+        try:
+            import android_utils
+            record("android_utils import", callable(android_utils.log)
+                   and callable(android_utils.run_on_ui_thread)
+                   and callable(android_utils.is_on_ui_thread))
+        except Exception as exc:
+            record("android_utils import", False, exc)
+            android_utils = None
+
+        # Check settings persistence without changing any existing user setting.
+        setting_key = "__element_compat_diag_temp__"
+        marker = "diagnostic-roundtrip-ok"
+        previous = self.get_setting(setting_key, None)
+        try:
+            self.set_setting(setting_key, marker)
+            stored = self.get_setting(setting_key, None)
+            record("settings read/write", stored == marker,
+                   "round-trip matched" if stored == marker else "stored value did not match")
+        except Exception as exc:
+            record("settings read/write", False, exc)
+        finally:
+            try:
+                if previous is None:
+                    self.storage.remove("setting:" + setting_key)
+                    try:
+                        import json
+                        keys = json.loads(self.storage.get("__setting_keys", "[]"))
+                        if setting_key in keys:
+                            keys.remove(setting_key)
+                            self.storage.set("__setting_keys", json.dumps(keys))
+                    except Exception:
+                        pass
+                else:
+                    self.set_setting(setting_key, previous)
+            except Exception:
+                pass
+
+        # Check that Android/Java class lookup works.
+        target = None
+        if hook_utils is not None:
+            try:
+                target = hook_utils.find_class(
+                    "elemsocial.com.core.plugins.hooks.ElementHookDiagnosticTarget"
+                )
+                record("Java class lookup", target is not None,
+                       "diagnostic target found" if target is not None else
+                       "diagnostic target class was not found")
+            except Exception as exc:
+                record("Java class lookup", False, exc)
+
+        # Install a hook only on our dedicated, side-effect-free test method.
+        # Always remove it in finally, including on assertion/invocation failure.
+        hook_ok = False
+        if target is not None:
+            handle = None
+            try:
+                method = None
+                for candidate in target.getDeclaredMethods():
+                    if str(candidate.getName()) == "echo":
+                        method = candidate
+                        break
+                if method is None:
+                    raise RuntimeError("echo(String) method not found")
+
+                def after_hook(param):
+                    current = param.getResult()
+                    param.setResult(str(current) + "|HOOK_OK")
+
+                handle = self.hook_method(method, after=after_hook)
+                if handle is None:
+                    raise RuntimeError("hook_method returned no hook handle")
+
+                actual = str(method.invoke(None, "ELEMENT_DIAGNOSTIC"))
+                hook_ok = actual == "ELEMENT_DIAGNOSTIC|HOOK_OK"
+                record("native hook + callback + result mutation", hook_ok,
+                       "returned " + actual if not hook_ok else "callback changed the result")
+            except Exception as exc:
+                record("native hook + callback + result mutation", False, exc)
+            finally:
+                if handle is not None:
+                    try:
+                        self.unhook_method(handle)
+                    except Exception:
+                        pass
+        else:
+            record("native hook + callback + result mutation", False,
+                   "skipped because Java class lookup failed")
+
+        # These helpers are useful but must not make a diagnostic crash the app.
+        if android_utils is not None:
+            try:
+                is_ui = android_utils.is_on_ui_thread()
+                record("Android UI-thread helper", isinstance(is_ui, bool),
+                       "is_on_ui_thread returned " + str(is_ui))
+            except Exception as exc:
+                record("Android UI-thread helper", False, exc)
+
+        passed = sum(1 for item in results if item["text"].startswith("PASS"))
+        failed = len(results) - passed
+        nodes = [
+            {"type": "title", "text": "Element compatibility report"},
+            {"type": "text", "text": str(passed) + " passed / " + str(failed) + " failed",
+             "secondary": "Native hook test is run only against Element's isolated diagnostic method."},
+            {"type": "divider"},
+        ] + results + [
+            {"type": "divider"},
+            {"type": "text", "text": "Important limitation",
+             "secondary": "This checks the installed build on this device. It cannot prove every third-party NimarkoGram plugin works or that Telegram-specific hooks exist."},
+        ]
+        try:
+            self.ui.screen("element_compatibility_diagnostic", "Compatibility report", nodes)
+        except Exception as exc:
+            self.ui.toast("Diagnostic finished: " + str(passed) + " passed, "
+                          + str(failed) + " failed. Report UI error: " + str(exc), True)

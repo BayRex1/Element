@@ -18,13 +18,43 @@ class _Storage:
 
 
 class _Theme:
+    """Helpers for changing Element's shared UI palette from a plugin."""
     def __init__(self, bridge):
         self._bridge = bridge
+
     def set(self, **kwargs):
         # Pass JSON instead of a Python dict: Chaquopy does not reliably
         # convert arbitrary Python dicts to Kotlin Map parameters.
         import json
         self._bridge.set_theme_json(json.dumps(kwargs))
+
+    def accent(self, color):
+        """Set the global accent color using the same format as theme.set()."""
+        self.set(accent=color)
+
+    def surfaces(self, body=None, block=None, block_soft=None):
+        """Override the app body and card surfaces without changing text colors."""
+        values = {}
+        if body is not None:
+            values["body"] = body
+        if block is not None:
+            values["block"] = block
+        if block_soft is not None:
+            values["blockSoft"] = block_soft
+        if values:
+            self.set(**values)
+
+    def halloween(self):
+        """Apply a dark plum palette with pumpkin-orange accents."""
+        self.set(
+            body="#100B18",
+            block="#21152B",
+            blockSoft="#35203D",
+            accent="#FF7A18",
+            textPrimary="#FFF7EF",
+            textSecondary="#D8C6DF",
+        )
+
     def reset(self):
         self._bridge.reset_theme()
 
@@ -157,6 +187,13 @@ class BasePlugin:
     def __init__(self, bridge):
         self._bridge = bridge
         self._hooks = {}
+        self._native_hooks = []
+        self.id = ""
+        self.name = ""
+        self.description = ""
+        self.author = ""
+        self.version = ""
+        self.icon = "🧩"
         self.storage = _Storage(bridge)
         self.theme = _Theme(bridge)
         self.ui = _UI(self)
@@ -199,6 +236,164 @@ class BasePlugin:
             callbacks.remove(callback)
         self._bridge.unregister_hook(str(event), callback)
 
+    def get_setting(self, key, default=None):
+        import json
+        raw = self.storage.get("setting:" + str(key))
+        if raw is None:
+            return default
+        try:
+            return json.loads(raw)
+        except Exception:
+            return raw
+
+    def set_setting(self, key, value):
+        import json
+        key = str(key)
+        self.storage.set("setting:" + key, json.dumps(value, ensure_ascii=False))
+        try:
+            keys = json.loads(self.storage.get("__setting_keys", "[]"))
+        except Exception:
+            keys = []
+        if key not in keys:
+            keys.append(key)
+        self.storage.set("__setting_keys", json.dumps(keys, ensure_ascii=False))
+
+    def export_settings(self):
+        import json
+        prefix = "setting:"
+        result = {}
+        # Storage intentionally exposes no key enumeration; keep an explicit
+        # index so exported settings remain scoped to this plugin.
+        keys = self.storage.get("__setting_keys", "[]")
+        try:
+            known = json.loads(keys)
+        except Exception:
+            known = []
+        for key in known:
+            raw = self.storage.get(prefix + str(key))
+            if raw is not None:
+                try:
+                    result[str(key)] = json.loads(raw)
+                except Exception:
+                    result[str(key)] = raw
+        return result
+
+    def import_settings(self, settings):
+        import json
+        keys = list(settings.keys()) if isinstance(settings, dict) else []
+        for key, value in (settings.items() if isinstance(settings, dict) else []):
+            self.storage.set("setting:" + str(key), json.dumps(value, ensure_ascii=False))
+        self.storage.set("__setting_keys", json.dumps(keys, ensure_ascii=False))
+
+    def _make_method_hook(self, callback=None, before=None, after=None):
+        if callback is not None and hasattr(callback, "replace_hooked_method"):
+            class _Replacement:
+                def before_hooked_method(self, param):
+                    result = callback.replace_hooked_method(param)
+                    if not getattr(param, "returnEarly", False):
+                        param.setResult(result)
+                def after_hooked_method(self, param):
+                    return None
+            return _Replacement()
+        if callback is not None:
+            return callback
+        class _Callbacks:
+            def before_hooked_method(self, param):
+                if before is not None:
+                    return before(param)
+            def after_hooked_method(self, param):
+                if after is not None:
+                    return after(param)
+        return _Callbacks()
+
+    def hook_method(self, method_or_constructor, xposed_hook=None, priority=None, before=None, after=None):
+        """Install an in-process ART hook on arm64 Android 8-15.
+
+        Callback objects should implement before_hooked_method/after_hooked_method,
+        or callers can pass plain before=/after= callables.
+        """
+        callback = self._make_method_hook(xposed_hook, before, after)
+        try:
+            from elemsocial.com.core.plugins.hooks import ElementPythonHookBridge
+            handle = ElementPythonHookBridge.hook(
+                method_or_constructor, self.id, callback, int(priority if priority is not None else 50)
+            )
+            self._native_hooks.append(handle)
+            return handle
+        except Exception as exc:
+            self.ui.toast("Не удалось установить Java hook: " + str(exc), True)
+            return None
+
+    def hook_all_methods(self, hook_class, method_name, xposed_hook=None, priority=None, before=None, after=None):
+        """Hook matching declared methods; missing Java classes fail safely."""
+        handles = []
+        if hook_class is None:
+            self.ui.toast("Не удалось установить Java hooks: класс не найден", True)
+            return handles
+        try:
+            for method in hook_class.getDeclaredMethods():
+                try:
+                    if str(method.getName()) != str(method_name):
+                        continue
+                    handle = self.hook_method(method, xposed_hook, priority, before, after)
+                    if handle is not None:
+                        handles.append(handle)
+                except Exception as exc:
+                    self.ui.toast("Не удалось установить hook метода " + str(method_name) + ": " + str(exc), True)
+        except Exception as exc:
+            self.ui.toast("Не удалось получить методы класса: " + str(exc), True)
+        return handles
+
+    def hook_all_constructors(self, hook_class, xposed_hook=None, priority=None, before=None, after=None):
+        handles = []
+        if hook_class is None:
+            self.ui.toast("Не удалось установить Java hooks: класс не найден", True)
+            return handles
+        try:
+            for constructor in hook_class.getDeclaredConstructors():
+                try:
+                    handle = self.hook_method(constructor, xposed_hook, priority, before, after)
+                    if handle is not None:
+                        handles.append(handle)
+                except Exception as exc:
+                    self.ui.toast("Не удалось установить hook конструктора: " + str(exc), True)
+        except Exception as exc:
+            self.ui.toast("Не удалось получить конструкторы класса: " + str(exc), True)
+        return handles
+
+    def unhook_method(self, unhook):
+        try:
+            if unhook is not None:
+                unhook.unhook()
+                if unhook in self._native_hooks:
+                    self._native_hooks.remove(unhook)
+        except Exception as exc:
+            self.ui.toast("Не удалось снять Java hook: " + str(exc), True)
+
+    def log(self, message):
+        self.ui.toast("[" + (self.id or self.name or "plugin") + "] " + str(message), True)
+
+    def create_settings(self):
+        return []
+
+    def on_app_event(self, event_type):
+        return None
+
+    def on_send_message_hook(self, account, params):
+        return None
+
+    def pre_request_hook(self, request_name, account, request):
+        return None
+
+    def post_request_hook(self, request_name, account, response, error):
+        return None
+
+    def on_update_hook(self, update_name, account, update):
+        return None
+
+    def on_updates_hook(self, container_name, account, updates):
+        return None
+
     def open_post(self, post_id):
         return self.ui.open_post(post_id)
 
@@ -225,3 +420,19 @@ class BasePlugin:
                 for callback in list(callbacks):
                     self._bridge.unregister_hook(event, callback)
             self._hooks.clear()
+            try:
+                from elemsocial.com.core.plugins.hooks import ElementPythonHookBridge
+                ElementPythonHookBridge.unhookAll(self.id)
+            except Exception:
+                pass
+            for handle in list(self._native_hooks):
+                try:
+                    handle.unhook()
+                except Exception:
+                    pass
+            self._native_hooks.clear()
+            try:
+                import plugin_settings
+                plugin_settings.unbind(self.id)
+            except Exception:
+                pass

@@ -40,7 +40,8 @@ data class ElementPluginUiNode(
     val value: String = "",
     val checked: Boolean = false,
     val enabled: Boolean = true,
-    val children: List<ElementPluginUiNode> = emptyList()
+    val children: List<ElementPluginUiNode> = emptyList(),
+    val options: List<String> = emptyList()
 )
 
 data class ElementPluginUiScreen(
@@ -92,6 +93,29 @@ private fun ElementPluginUiNodeView(node: ElementPluginUiNode, onAction: (String
             variant = if (node.type == "soft_button") ElementButtonVariant.Soft else ElementButtonVariant.Primary,
             onClick = { node.callbackId?.let { onAction(it, "{}") } }
         )
+        "selector" -> {
+            var selectedIndex by remember(node.callbackId, node.value) {
+                mutableStateOf(node.value.toIntOrNull()?.coerceAtLeast(0) ?: 0)
+            }
+            val options = node.options
+            val selectedText = options.getOrNull(selectedIndex) ?: "—"
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                ElementButton(
+                    title = if (node.text.isBlank()) selectedText else node.text + ": " + selectedText,
+                    enabled = node.enabled && options.isNotEmpty(),
+                    variant = ElementButtonVariant.Soft,
+                    onClick = {
+                        if (options.isNotEmpty()) {
+                            selectedIndex = (selectedIndex + 1) % options.size
+                            node.callbackId?.let { onAction(it, org.json.JSONObject().put("value", selectedIndex).toString()) }
+                        }
+                    }
+                )
+                if (node.secondary.isNotBlank()) {
+                    Text(node.secondary, color = ElementUiPalette.TextSecondary, fontSize = 13.sp)
+                }
+            }
+        }
         "switch" -> {
             var checked by remember(node.callbackId, node.checked) { mutableStateOf(node.checked) }
             Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
