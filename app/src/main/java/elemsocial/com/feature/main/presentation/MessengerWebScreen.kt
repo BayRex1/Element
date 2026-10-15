@@ -1,6 +1,7 @@
 package elemsocial.com.feature.main.presentation
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -112,6 +113,7 @@ private data class NativeMessage(
     val type: String = "text",
     val fileName: String? = null,
     val previewBase64: String? = null,
+    val mediaUrl: String? = null,
     val duration: Int = 0,
     val date: String = "",
     val edited: Boolean = false,
@@ -151,8 +153,28 @@ fun MessengerScreen(
     var showEmojiPicker by remember { mutableStateOf(false) }
     var showChatMenu by remember { mutableStateOf(false) }
     var previewImage by remember { mutableStateOf<String?>(null) }
+    var pendingSaveMessage by remember { mutableStateOf<NativeMessage?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    val saveAttachmentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("*/*")
+    ) { uri: Uri? ->
+        val message = pendingSaveMessage
+        if (uri != null && message != null && !message.previewBase64.isNullOrBlank()) {
+            scope.launch {
+                runCatching {
+                    val raw = message.previewBase64.substringAfter("base64,", message.previewBase64)
+                    val bytes = Base64.decode(raw, Base64.DEFAULT)
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                            ?: throw IOException("Не удалось сохранить файл")
+                    }
+                }.onFailure { error = it.message ?: "Не удалось сохранить файл" }
+            }
+        }
+        pendingSaveMessage = null
+    }
 
     val attachmentPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -322,6 +344,7 @@ fun MessengerScreen(
             previewBase64 = string(preview?.get("base64")).ifBlank {
                 string(file?.get("base64")).ifBlank { null }
             },
+            mediaUrl = string(file?.get("url")).ifBlank { string(file?.get("download_url")).ifBlank { null } },
             duration = int(file?.get("duration")) ?: 0,
             date = string(raw["date"]),
             edited = decrypted?.get("is_edited") == true,
@@ -647,7 +670,19 @@ fun MessengerScreen(
                                 }.onFailure { error = it.message ?: "Не удалось удалить сообщение" }
                             }
                         },
-                        onMediaClick = { if (msg.type == "image") previewImage = msg.previewBase64 }
+                        onMediaClick = {
+                            when {
+                                msg.type == "image" && !msg.previewBase64.isNullOrBlank() -> previewImage = msg.previewBase64
+                                !msg.previewBase64.isNullOrBlank() -> {
+                                    pendingSaveMessage = msg
+                                    saveAttachmentPicker.launch(msg.fileName ?: "element-attachment")
+                                }
+                                !msg.mediaUrl.isNullOrBlank() -> runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(msg.mediaUrl)))
+                                }.onFailure { error = "Не удалось открыть вложение" }
+                                else -> error = "У сервера нет доступного файла для этого вложения."
+                            }
+                        }
                     )
                 }
             }
@@ -803,7 +838,7 @@ private fun MessageBubble(
                     .clip(RoundedCornerShape(18.dp, 18.dp, if (mine) 5.dp else 18.dp, if (mine) 5.dp else 18.dp))
                     .background(if (mine) MessengerAccent else MessengerIncoming)
                     .clickable {
-                        if (message.type == "image" && !message.previewBase64.isNullOrBlank()) onMediaClick()
+                        if (message.type in setOf("image", "video", "voice", "file")) onMediaClick()
                         else if (message.mid != null) onReact()
                     }
                     .padding(if (message.type == "image" && message.previewBase64 != null) 0.dp else 11.dp)
