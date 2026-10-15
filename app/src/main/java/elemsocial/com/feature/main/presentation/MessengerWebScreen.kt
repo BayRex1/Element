@@ -2,7 +2,11 @@ package elemsocial.com.feature.main.presentation
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Base64
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +86,8 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.net.URL
+import java.io.IOException
 import java.util.Locale
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
@@ -141,8 +148,80 @@ fun MessengerScreen(
     var showKeyDialog by remember { mutableStateOf(keyword.isBlank()) }
     var searchOpen by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
+    var showEmojiPicker by remember { mutableStateOf(false) }
+    var showChatMenu by remember { mutableStateOf(false) }
+    var previewImage by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    val attachmentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                runCatching {
+                    val resolver = context.contentResolver
+                    val mime = resolver.getType(uri).orEmpty().lowercase(Locale.ROOT)
+                    val fileName = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                        ?.use { cursor ->
+                            if (cursor.moveToFirst()) cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)) else null
+                        } ?: "attachment"
+                    val data = withContext(Dispatchers.IO) {
+                        resolver.openInputStream(uri)?.use { it.readBytes() }
+                            ?: throw IOException("Не удалось прочитать файл")
+                    }
+                    if (data.isEmpty()) throw IOException("Файл пустой")
+                    if (data.size > 12 * 1024 * 1024) throw IOException("Файл больше 12 МБ — выберите файл поменьше")
+                    val chat = selected ?: throw IOException("Сначала откройте чат")
+                    val type = when {
+                        mime.startsWith("image/") -> "image"
+                        mime.startsWith("video/") -> "video"
+                        mime.startsWith("audio/") -> "voice"
+                        else -> "file"
+                    }
+                    val encoded = Base64.encodeToString(data, Base64.NO_WRAP)
+                    val payload = JSONObject()
+                        .put("type", type)
+                        .put("text", "")
+                        .put("file", JSONObject()
+                            .put("name", fileName)
+                            .put("mime_type", mime)
+                            .put("base64", encoded))
+                        .toString()
+                    val temp = (System.currentTimeMillis() % 1_000_000_000).toLong()
+                    val response = socketClient.sendRequest(
+                        mapOf(
+                            "type" to "messenger",
+                            "action" to "send_message",
+                            "temp_mid" to temp,
+                            "target" to mapOf("id" to chat.id, "type" to chat.type),
+                            "message" to payload
+                        )
+                    )
+                    val status = response["status"]?.toString()?.lowercase(Locale.ROOT)
+                    if (status != null && status !in setOf("ok", "success")) {
+                        throw IOException(response["text"]?.toString() ?: response["message"]?.toString() ?: "Не удалось отправить файл")
+                    }
+                    val mid = (response["mid"] as? Number)?.toLong()
+                    messages = messages + NativeMessage(
+                        mid = mid,
+                        tempMid = if (mid == null) temp else null,
+                        uid = accountId,
+                        text = when (type) {
+                            "image" -> "Фото"
+                            "video" -> "Видео"
+                            "voice" -> "Аудио"
+                            else -> fileName
+                        },
+                        type = type,
+                        fileName = fileName,
+                        previewBase64 = encoded,
+                        date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
+                    )
+                }.onFailure { error = it.message ?: "Не удалось отправить вложение" }
+            }
+        }
+    }
 
     fun map(value: Any?): Map<String, Any?>? = when (value) {
         is Map<*, *> -> value.entries.associate { it.key.toString() to it.value }
@@ -513,10 +592,10 @@ fun MessengerScreen(
                     IconButton(onClick = { searchOpen = false; searchText = "" }) { Icon(Icons.Default.Close, "Закрыть", tint = Color.White) }
                 } else {
                     IconButton(onClick = { searchOpen = true }) { Icon(Icons.Default.Search, "Поиск", tint = Color.White) }
-                    IconButton(onClick = { /* call protocol is wired separately */ }) { Icon(Icons.Default.Call, "Позвонить", tint = Color.White) }
-                    IconButton(onClick = { /* video call protocol is wired separately */ }) { Icon(Icons.Default.Videocam, "Видео", tint = Color.White) }
+                    IconButton(onClick = { error = "Голосовые звонки пока не подключены на стороне протокола сервера." }) { Icon(Icons.Default.Call, "Позвонить", tint = Color.White) }
+                    IconButton(onClick = { error = "Видеозвонки пока не подключены на стороне протокола сервера." }) { Icon(Icons.Default.Videocam, "Видео", tint = Color.White) }
                 }
-                IconButton(onClick = { /* chat menu */ }) { Icon(Icons.Default.MoreVert, "Меню", tint = Color.White) }
+                IconButton(onClick = { showChatMenu = true }) { Icon(Icons.Default.MoreVert, "Меню", tint = Color.White) }
             }
 
             if (editing != null) {
@@ -561,17 +640,31 @@ fun MessengerScreen(
                         onDelete = {
                             val mid = msg.mid
                             if (mid != null) scope.launch {
-                                val response = socketClient.sendRequest(mapOf("type" to "messenger", "action" to "delete_message", "mid" to mid, "target" to mapOf("id" to chat.id, "type" to chat.type)))
-                                if (string(response["status"]).lowercase() in setOf("ok", "success")) messages = messages.filterNot { it.mid == mid }
-                                else error = string(response["text"]).ifBlank { "Не удалось удалить сообщение" }
+                                runCatching {
+                                    val response = socketClient.sendRequest(mapOf("type" to "messenger", "action" to "delete_message", "mid" to mid, "target" to mapOf("id" to chat.id, "type" to chat.type)))
+                                    if (string(response["status"]).lowercase() in setOf("ok", "success")) messages = messages.filterNot { it.mid == mid }
+                                    else error = string(response["text"]).ifBlank { "Не удалось удалить сообщение" }
+                                }.onFailure { error = it.message ?: "Не удалось удалить сообщение" }
                             }
-                        }
+                        },
+                        onMediaClick = { if (msg.type == "image") previewImage = msg.previewBase64 }
                     )
                 }
             }
 
+            if (showEmojiPicker) {
+                Row(
+                    Modifier.fillMaxWidth().background(MessengerSurface).padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("😀", "😂", "❤️", "🔥", "👍", "🥹", "🎉", "🙏").forEach { emoji ->
+                        Text(emoji, modifier = Modifier.clickable { messageText += emoji }.padding(5.dp), fontSize = 24.sp)
+                    }
+                }
+            }
             Row(Modifier.fillMaxWidth().imePadding().padding(horizontal = 8.dp, vertical = 7.dp), verticalAlignment = Alignment.Bottom) {
-                RoundAction(Icons.Default.Add, "Вложение")
+                RoundAction(Icons.Default.Add, "Вложение", onClick = { attachmentPicker.launch(arrayOf("*/*")) })
                 Box(Modifier.weight(1f).padding(horizontal = 7.dp).border(1.dp, Color(0xFF343434), RoundedCornerShape(28.dp)).background(MessengerSurface, RoundedCornerShape(28.dp))) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
@@ -591,11 +684,11 @@ fun MessengerScreen(
                                 unfocusedContainerColor = Color.Transparent
                             )
                         )
-                        IconButton(onClick = { }) { Icon(Icons.Default.EmojiEmotions, "Эмодзи", tint = Color(0xFFD0D0D0)) }
+                        IconButton(onClick = { showEmojiPicker = !showEmojiPicker }) { Icon(Icons.Default.EmojiEmotions, "Эмодзи", tint = if (showEmojiPicker) MessengerAccent else Color(0xFFD0D0D0)) }
                     }
                 }
                 if (messageText.isBlank()) {
-                    RoundAction(Icons.Default.Mic, "Голосовое", accent = true)
+                    RoundAction(Icons.Default.Mic, "Выбрать аудио", accent = true, onClick = { attachmentPicker.launch(arrayOf("audio/*")) })
                 } else {
                     RoundAction(Icons.Default.Send, "Отправить", accent = true, onClick = { scope.launch { sendMessage() } })
                 }
@@ -612,6 +705,43 @@ fun MessengerScreen(
             dismissButton = { if (keyword.isNotBlank()) TextButton(onClick = { showKeyDialog = false }) { Text("Отмена") } }
         )
     }
+    if (showChatMenu) {
+        AlertDialog(
+            onDismissRequest = { showChatMenu = false },
+            title = { Text("Настройки чата") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("История сообщений: ${messages.size}")
+                    Text("Тип чата: ${selected?.type ?: 0}")
+                    TextButton(onClick = {
+                        val chat = selected
+                        showChatMenu = false
+                        if (chat != null) scope.launch { loadMessages(chat) }
+                    }) { Text("Обновить сообщения") }
+                    TextButton(onClick = {
+                        showChatMenu = false
+                        showKeyDialog = true
+                    }) { Text("Настроить секретный ключ") }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showChatMenu = false }) { Text("Закрыть") } }
+        )
+    }
+    previewImage?.let { base64 ->
+        Dialog(onDismissRequest = { previewImage = null }) {
+            Box(
+                Modifier.fillMaxSize().background(Color.Black).clickable { previewImage = null },
+                contentAlignment = Alignment.Center
+            ) {
+                val bitmap by rememberBase64Bitmap(base64)
+                if (bitmap != null) {
+                    Image(bitmap = bitmap!!, contentDescription = "Просмотр изображения", modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+                } else {
+                    Text("Не удалось открыть изображение", color = Color.White)
+                }
+            }
+        }
+    }
     error?.let { message ->
         AlertDialog(onDismissRequest = { error = null }, title = { Text("Мессенджер") }, text = { Text(message) }, confirmButton = { TextButton(onClick = { error = null }) { Text("OK") } })
     }
@@ -619,8 +749,29 @@ fun MessengerScreen(
 
 @Composable
 private fun Avatar(name: String, avatar: String?, size: androidx.compose.ui.unit.Dp) {
+    val bitmap by rememberAvatarBitmap(avatar)
     Box(Modifier.size(size).clip(CircleShape).background(Color(0xFF9D89C7)), contentAlignment = Alignment.Center) {
-        Text(name.firstOrNull()?.uppercase() ?: "?", color = Color.White, fontSize = (size.value * .42f).sp, fontWeight = FontWeight.Medium)
+        if (bitmap != null) {
+            Image(bitmap = bitmap!!, contentDescription = name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            Text(name.firstOrNull()?.uppercase() ?: "?", color = Color.White, fontSize = (size.value * .42f).sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun rememberAvatarBitmap(source: String?) = produceState<ImageBitmap?>(initialValue = null, key1 = source) {
+    if (source.isNullOrBlank()) return@produceState
+    value = withContext(Dispatchers.IO) {
+        runCatching {
+            val bytes = if (source.startsWith("http://") || source.startsWith("https://")) {
+                URL(source).openStream().use { it.readBytes() }
+            } else {
+                val raw = source.substringAfter("base64,", source)
+                Base64.decode(raw, Base64.DEFAULT)
+            }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }.getOrNull()
     }
 }
 
@@ -637,7 +788,8 @@ private fun MessageBubble(
     mine: Boolean,
     onReact: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onMediaClick: () -> Unit
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Column(horizontalAlignment = if (mine) Alignment.End else Alignment.Start) {
@@ -650,7 +802,10 @@ private fun MessageBubble(
                     .let { if (message.type == "image") it else Modifier }
                     .clip(RoundedCornerShape(18.dp, 18.dp, if (mine) 5.dp else 18.dp, if (mine) 5.dp else 18.dp))
                     .background(if (mine) MessengerAccent else MessengerIncoming)
-                    .clickable(enabled = message.mid != null) { onReact() }
+                    .clickable {
+                        if (message.type == "image" && !message.previewBase64.isNullOrBlank()) onMediaClick()
+                        else if (message.mid != null) onReact()
+                    }
                     .padding(if (message.type == "image" && message.previewBase64 != null) 0.dp else 11.dp)
             ) {
                 Column {
