@@ -40,7 +40,26 @@ jobs:
           packages: 'platform-tools'
 
       - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973"
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            echo "Android SDK package installation attempt ${attempt}/3"
+            if sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973"; then
+              if [[ -x "$ANDROID_SDK_ROOT/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" ]]; then
+                echo "Android SDK packages installed successfully."
+                exit 0
+              fi
+              echo "::warning::NDK install returned success but clang is missing; treating install as incomplete."
+            else
+              echo "::warning::Android SDK package installation failed on attempt ${attempt}/3"
+            fi
+            rm -rf "$ANDROID_SDK_ROOT/ndk/27.0.12077973"
+            rm -rf "$ANDROID_SDK_ROOT/.temp"/*
+            if [[ "${attempt}" -lt 3 ]]; then sleep 10; fi
+          done
+          echo "::error::Android SDK package installation failed after 3 attempts"
+          exit 1
 
       - name: Restore repository signing key
         shell: bash
