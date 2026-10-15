@@ -113,6 +113,7 @@ private data class NativeMessage(
     val type: String = "text",
     val fileName: String? = null,
     val previewBase64: String? = null,
+    val fileBase64: String? = null,
     val mediaUrl: String? = null,
     val duration: Int = 0,
     val date: String = "",
@@ -161,10 +162,11 @@ fun MessengerScreen(
         contract = ActivityResultContracts.CreateDocument("*/*")
     ) { uri: Uri? ->
         val message = pendingSaveMessage
-        if (uri != null && message != null && !message.previewBase64.isNullOrBlank()) {
+        val attachmentBase64 = message?.fileBase64 ?: message?.previewBase64
+        if (uri != null && message != null && !attachmentBase64.isNullOrBlank()) {
             scope.launch {
                 runCatching {
-                    val raw = message.previewBase64.substringAfter("base64,", message.previewBase64)
+                    val raw = attachmentBase64.substringAfter("base64,", attachmentBase64)
                     val bytes = Base64.decode(raw, Base64.DEFAULT)
                     withContext(Dispatchers.IO) {
                         context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
@@ -238,6 +240,7 @@ fun MessengerScreen(
                         type = type,
                         fileName = fileName,
                         previewBase64 = encoded,
+                        fileBase64 = encoded,
                         date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US).format(Date())
                     )
                 }.onFailure { error = it.message ?: "Не удалось отправить вложение" }
@@ -344,6 +347,7 @@ fun MessengerScreen(
             previewBase64 = string(preview?.get("base64")).ifBlank {
                 string(file?.get("base64")).ifBlank { null }
             },
+            fileBase64 = string(file?.get("base64")).ifBlank { null },
             mediaUrl = string(file?.get("url")).ifBlank { string(file?.get("download_url")).ifBlank { null } },
             duration = int(file?.get("duration")) ?: 0,
             date = string(raw["date"]),
